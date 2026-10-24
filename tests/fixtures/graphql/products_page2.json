@@ -1,0 +1,34 @@
+{
+  "data": {
+    "products": {
+      "pageInfo": {"hasNextPage": false, "endCursor": null},
+      "nodes": [
+        {
+          "id": "gid://shopify/Product/8012345678903",
+          "title": "Kestrel Down Parka",
+          "handle": "kestrel-down-parka",
+          "descriptionHtml": "<p>800-fill down belay parka sized to layer over shells at two a.m. on the Sharpe route.</p>",
+          "vendor": "Timberline Supply",
+          "productType": "Parka",
+          "tags": ["parka", "down"],
+          "status": "ACTIVE",
+          "updatedAt": "2026-08-30T10:00:00Z",
+          "seo": {"title": "Kestrel Down Parka - 800 fill belay layer", "description": "Belay parka for alpine walls."},
+          "category": null,
+          "priceRangeV2": {"minVariantPrice": {"amount": "429.00"}, "maxVariantPrice": {"amount": "429.00"}},
+          "images": {"nodes": []},
+          "video": {"nodes": []},
+          "metafields": {"nodes": []},
+          "variants": {"nodes": []}
+        }
+      ]
+    }
+  },
+  "extensions": {
+    "cost": {
+      "requestedQueryCost": 22,
+      "actualQueryCost": 22,
+      "throttleStatus": {"maximumAvailable": 2000.0, "currentlyAvailable": 1978.0, "restoreRate": 100.0}
+    }
+  }
+}

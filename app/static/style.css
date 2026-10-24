@@ -78,6 +78,8 @@ a:hover { text-decoration: underline; }
 .btn:hover { filter: brightness(1.08); }
 .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 .btn.small { padding: 6px 12px; font-size: 13px; }
+.page-actions { display: flex; justify-content: flex-end; margin: 18px 0 10px; }
+.inline-form { display: inline; }
 .issue-list { list-style: none; padding: 0; margin: 8px 0; }
 .issue-list li { padding: 7px 0; border-bottom: 1px solid var(--border); }
 .issue-list .count {

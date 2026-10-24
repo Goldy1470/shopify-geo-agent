@@ -1,25 +1,29 @@
-"""Shared fixtures: every test gets a fresh SQLite DB and config path."""
+"""Shared fixtures: every test gets a fresh SQLite DB (legacy + mirror) and config."""
 
 import pytest
 
 import app.config as config
-import app.db as db
+import app.db.legacy as legacy
+from app.db.session import reset_engine
 
 
 @pytest.fixture(autouse=True)
 def isolated_state(tmp_path, monkeypatch):
-    db_file = tmp_path / "test.sqlite"
-    monkeypatch.setattr(db, "DB_PATH", str(db_file))
+    # Legacy thread-local tables point at a temp file.
+    monkeypatch.setattr(legacy, "DB_PATH", str(tmp_path / "test.sqlite"))
+    legacy._local.conn = None
+    legacy.init_db()
+    # The SQLAlchemy mirror gets its own temp SQLite via DATABASE_URL.
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'mirror.sqlite'}")
+    reset_engine()
+    # Config lives in the test dir too.
     monkeypatch.setattr(config, "CONFIG_PATH", str(tmp_path / "config.json"))
-    # Reset the thread-local connection so it reopens against the new file.
-    db._local.conn = None
-    db.init_db()
     yield
 
 
 @pytest.fixture()
 def client():
-    """TestClient with done startup; cookies handled for CSRF."""
+    """TestClient with startup; cookies handled for CSRF."""
     from fastapi.testclient import TestClient
 
     from app.main import app

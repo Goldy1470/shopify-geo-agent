@@ -112,8 +112,8 @@ def score_faq(p: dict) -> tuple[int, list[str]]:
 
 def score_media(p: dict) -> tuple[int, list[str]]:
     issues = []
-    images = [i for i in (p.get("images") or []) if not (i.get("src") or "").endswith(".mp4")]
-    videos = [i for i in (p.get("images") or []) if (i.get("src") or "").endswith(".mp4")]
+    images = [i for i in (p.get("images") or []) if not (i.get("src") or "").endswith(".mp4") and not i.get("is_video")]
+    videos = [i for i in (p.get("images") or []) if (i.get("src") or "").endswith(".mp4") or i.get("is_video")]
     missing_alt = [i for i in images if not (i.get("alt") or "").strip()]
     described_alt = [i for i in images if (i.get("alt") or "").strip() and len(i.get("alt") or "") > 25]
 

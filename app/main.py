@@ -21,6 +21,7 @@ from .core.security import (
 from .db import execute
 from .fixer import FIX_TITLES, apply_fix, generate_fixes
 from .scoring import score_product
+from .shopify import get_catalog
 from .shopify_client import ShopifyClient
 from .visibility import run_prompt_via_openai, save_run, visibility_summary
 
@@ -120,15 +121,16 @@ async def csrf_cookie_middleware(request: Request, call_next):
 @app.on_event("startup")
 def startup():
     database.init_db()
+    database.create_all()
 
 
 def ctx(request: Request, **extra):
     cfg = load_config()
-    client = ShopifyClient()
+    catalog = get_catalog()
     base = {
         "request": request,
         "cfg": cfg,
-        "client_live": client.is_live,
+        "client_live": catalog.mode == "live",
         "store_domain": cfg["shop_domain"],
         "csrf": getattr(request.state, "csrf", ""),
     }
@@ -142,8 +144,7 @@ def _render(request: Request, name: str, extra: dict):
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
-    client = ShopifyClient()
-    products = client.get_products()
+    products = get_catalog().list_products()
     scored = [score_product(p) for p in products]
     avg = round(sum(s["score"] for s in scored) / len(scored)) if scored else 0
     grades = {"A": 0, "B": 0, "C": 0, "D": 0}
@@ -172,18 +173,23 @@ def dashboard(request: Request):
     )
 
 
+@app.post("/sync")
+async def sync_catalog():
+    """Pull the (live or mock) catalog into the local mirror."""
+    await get_catalog().sync_async()
+    return RedirectResponse("/", status_code=303)
+
+
 @app.get("/products", response_class=HTMLResponse)
 def products(request: Request):
-    client = ShopifyClient()
-    products = client.get_products()
+    products = get_catalog().list_products()
     scored = sorted([score_product(p) for p in products], key=lambda s: s["score"])
     return _render(request, "products.html", ctx(request, scored=scored))
 
 
 @app.get("/products/{product_id}", response_class=HTMLResponse)
 def product_detail(request: Request, product_id: str):
-    client = ShopifyClient()
-    p = client.get_product(product_id)
+    p = get_catalog().get_product(product_id)
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
     scoring = score_product(p)
@@ -236,8 +242,7 @@ def accessibility_result(request: Request, check_id: int):
 
 @app.get("/visibility", response_class=HTMLResponse)
 def visibility_page(request: Request):
-    client = ShopifyClient()
-    products = client.get_products()
+    products = get_catalog().list_products()
     return _render(request, "visibility.html", ctx(request, **visibility_summary(products)))
 
 
@@ -248,8 +253,7 @@ async def visibility_paste(
     engine: str = Form(...),
     response_text: str = Form(...),
 ):
-    client = ShopifyClient()
-    save_run(prompt, engine, "paste", response_text, client.get_products())
+    save_run(prompt, engine, "paste", response_text, get_catalog().list_products())
     return RedirectResponse("/visibility", status_code=303)
 
 
@@ -261,8 +265,7 @@ async def visibility_api_run(request: Request, prompt: str = Form(...)):
             {"error": "No OpenAI API key configured. Use paste mode or add the key in Settings."},
             status_code=400,
         )
-    client = ShopifyClient()
-    run = run_prompt_via_openai(prompt, cfg["openai_api_key"], client.get_products())
+    run = run_prompt_via_openai(prompt, cfg["openai_api_key"], get_catalog().list_products())
     if run.get("error"):
         return JSONResponse(run, status_code=400)
     return RedirectResponse("/visibility", status_code=303)
@@ -274,10 +277,10 @@ def fixes_page(request: Request):
     applied = database.query(
         "SELECT * FROM fixes WHERE status='applied' ORDER BY applied_at DESC LIMIT 20"
     )
+    catalog = get_catalog()
     by_product: dict[str, str] = {}
-    client = ShopifyClient()
     for f in pending:
-        p = client.get_product(f["product_id"])
+        p = catalog.get_product(f["product_id"])
         by_product.setdefault(
             f["product_id"], p.get("title", f["product_id"]) if p else f["product_id"]
         )
@@ -296,15 +299,15 @@ def fixes_page(request: Request):
 
 @app.post("/fixes/generate")
 def fixes_generate():
-    client = ShopifyClient()
-    generate_fixes(client.get_products())
+    generate_fixes(get_catalog().list_products())
     return RedirectResponse("/fixes", status_code=303)
 
 
 @app.post("/fixes/{fix_id}/approve")
 def fix_approve(fix_id: int):
-    client = ShopifyClient()
-    result = apply_fix(client, fix_id)
+    # Sync handler: FastAPI runs it in the threadpool (no running event loop),
+    # which lets CatalogService bridge to its async GraphQL client when live.
+    result = apply_fix(get_catalog(), fix_id)
     return JSONResponse(result)
 
 
@@ -316,7 +319,7 @@ def fix_discard(fix_id: int):
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
-    client = ShopifyClient()
+    client = ShopifyClient()  # kept for the connection probe only
     return _render(request, "settings.html", ctx(request, connection=client.check_connection()))
 
 

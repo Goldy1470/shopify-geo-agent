@@ -4,6 +4,12 @@
 <h1>Store GEO overview</h1>
 <p class="sub">How well your catalog ranks in AI shopping results and personal agents (Muse, Instinct, ChatGPT Shopping).</p>
 
+<div class="page-actions">
+  <form method="post" action="/sync" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <button class="btn small" type="submit">{% if client_live %}Sync catalog{% else %}Refresh mock catalog{% endif %}</button>
+  </form>
+</div>
 <section class="cards">
   <div class="card big">
     <div class="kpi">{{ avg }}</div>

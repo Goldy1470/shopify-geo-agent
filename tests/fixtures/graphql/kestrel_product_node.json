@@ -1,0 +1,41 @@
+{
+  "shopify_node_shape": "Product (Admin GraphQL 2026-10)",
+  "product": {
+    "id": "gid://shopify/Product/8012345678901",
+    "title": "Kestrel Alpine Shell Jacket",
+    "handle": "kestrel-alpine-shell-jacket",
+    "descriptionHtml": "<p>Built for wet alpine starts and long approaches, the Kestrel Alpine Shell Jacket pairs a 3-layer 20,000 mm waterproof laminate with a helmet-compatible hood and pit zips that dump heat on the switchbacks.</p><ul><li>Use case: alpine climbing, backcountry skiing, storm-day commuting</li><li>Materials: 3-layer waterproof laminate, fully taped seams</li><li>Dimensions: packs to 1.1 L in its own chest pouch; weight 13 oz</li><li>Compatibility: helmet-compatible hood; fits over a puffy mid-layer</li><li>Limitations: not insulated on its own; no recco reflector</li></ul><p>Care: machine wash cold on gentle, tumble low, re-proof with DWR wash-in after ten washes.</p>",
+    "vendor": "Timberline Supply",
+    "productType": "Shell Jacket",
+    "tags": ["jacket", "rain", "alpine", "waterproof", "commuting"],
+    "status": "ACTIVE",
+    "createdAt": "2026-03-14T09:12:00Z",
+    "updatedAt": "2026-10-02T15:47:00Z",
+    "seo": {"title": "Kestrel Alpine Shell Jacket - 3-layer waterproof", "description": "3-layer waterproof shell for alpine climbing, backcountry skiing, and storm commuting."},
+    "category": {"id": "gid://shopify/TaxonomyCategory/sg-4-17-2-1", "name": "Jackets & Vests"},
+    "priceRangeV2": {"minVariantPrice": {"amount": "289.00"}, "maxVariantPrice": {"amount": "319.00"}},
+    "images": {"nodes": [
+      {"url": "https://cdn.shop.example.com/kestrel-front.jpg", "altText": "Timberline Kestrel Alpine Shell front view in storm light", "position": 1},
+      {"url": "https://cdn.shop.example.com/kestrel-back.jpg", "altText": "Kestrel Alpine Shell back with helmet hood raised", "position": 2},
+      {"url": "https://cdn.shop.example.com/kestrel-pitzips.jpg", "altText": "Kestrel pit zip venting on a climber, close-up of the zipper pull", "position": 3},
+      {"url": "https://cdn.shop.example.com/kestrel-pockets.jpg", "altText": "Kestrel chest pouch packed to 1.1 L next to a water bottle", "position": 4},
+      {"url": "https://cdn.shop.example.com/kestrel-seam.jpg", "altText": "Kestrel fully-taped 3-layer laminate seam macro", "position": 5},
+      {"url": "https://cdn.shop.example.com/kestrel-video-cover.jpg", "altText": "Storm test video of the Kestrel hood in wind-driven rain", "position": 6}
+    ]},
+    "video": {"nodes": [{"id": "gid://shopify/MediaImage/99", "altText": "Storm test footage of the Kestrel hood in wind-driven rain"}]},
+    "metafields": {"nodes": [
+      {"namespace": "yotpo", "key": "reviews_count", "type": "number_integer", "value": "914"},
+      {"namespace": "yotpo", "key": "average_rating", "type": "number_decimal", "value": "4.7"},
+      {"namespace": "custom", "key": "material", "type": "single_line_text_field", "value": "3-layer waterproof laminate, fully taped seams"},
+      {"namespace": "custom", "key": "dimensions", "type": "single_line_text_field", "value": "Packs to 1.1 L, 13 oz"},
+      {"namespace": "custom", "key": "compatibility", "type": "single_line_text_field", "value": "Helmet-compatible hood; fits over a puffy mid-layer"},
+      {"namespace": "custom", "key": "intended_use", "type": "single_line_text_field", "value": "Alpine climbing, backcountry skiing, storm-day commuting"},
+      {"namespace": "custom", "key": "limitations", "type": "single_line_text_field", "value": "Not insulated on its own; no recco reflector"}
+    ]},
+    "variants": {"nodes": [
+      {"id": "gid://shopify/ProductVariant/671", "title": "Small / Black", "sku": "KES-AS-BLK-S", "barcode": "01938247112288", "position": 1, "price": {"amount": "289.00"}, "currentlyNotAvailable": false},
+      {"id": "gid://shopify/ProductVariant/672", "title": "Medium / Black", "sku": "KES-AS-BLK-M", "barcode": "01938247112295", "position": 2, "price": {"amount": "289.00"}, "currentlyNotAvailable": false},
+      {"id": "gid://shopify/ProductVariant/673", "title": "Large / Black", "sku": "KES-AS-BLK-L", "barcode": "01938247112301", "position": 3, "price": {"amount": "299.00"}, "currentlyNotAvailable": false}
+    ]}
+  }
+}

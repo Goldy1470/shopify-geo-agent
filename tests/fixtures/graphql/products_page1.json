@@ -1,0 +1,60 @@
+{
+  "data": {
+    "products": {
+      "pageInfo": {"hasNextPage": true, "endCursor": "eyJpZCI6Imdple0xIn0"},
+      "nodes": [
+        {
+          "id": "gid://shopify/Product/8012345678901",
+          "title": "Kestrel Alpine Shell Jacket",
+          "handle": "kestrel-alpine-shell-jacket",
+          "descriptionHtml": "<p>3-layer 20,000 mm waterproof laminate, helmet-compatible hood, pit zips for alpine starts.</p><ul><li>Material: 3-layer laminate</li><li>Dimensions: packs to 1.1 L</li></ul>",
+          "vendor": "Timberline Supply",
+          "productType": "Shell Jacket",
+          "tags": ["jacket", "rain"],
+          "status": "ACTIVE",
+          "updatedAt": "2026-10-02T15:47:00Z",
+          "seo": {"title": "Kestrel Alpine Shell Jacket", "description": "Waterproof alpine shell."},
+          "category": {"id": "gid://shopify/TaxonomyCategory/sg-4-17-2-1", "name": "Jackets & Vests"},
+          "priceRangeV2": {"minVariantPrice": {"amount": "289.00"}, "maxVariantPrice": {"amount": "319.00"}},
+          "images": {"nodes": [
+            {"url": "https://cdn.shop.example.com/kestrel-front.jpg", "altText": "Timberline Kestrel front view in storm light", "position": 1},
+            {"url": "https://cdn.shop.example.com/kestrel-back.jpg", "altText": "Kestrel back with helmet hood raised", "position": 2}
+          ]},
+          "video": {"nodes": []},
+          "metafields": {"nodes": [
+            {"namespace": "yotpo", "key": "reviews_count", "type": "number_integer", "value": "914"},
+            {"namespace": "yotpo", "key": "average_rating", "type": "number_decimal", "value": "4.7"}
+          ]},
+          "variants": {"nodes": [
+            {"id": "gid://shopify/ProductVariant/671", "title": "Small / Black", "sku": "KES-AS-BLK-S", "barcode": "01938247112288", "position": 1, "price": {"amount": "289.00"}, "currentlyNotAvailable": false}
+          ]}
+        },
+        {
+          "id": "gid://shopify/Product/8012345678902",
+          "title": "Kestrel Tapper Tee",
+          "handle": "kestrel-tapper-tee",
+          "descriptionHtml": "<p>Quick-dry rope-friendly tee for summer cragging.</p>",
+          "vendor": "Timberline Supply",
+          "productType": "T-Shirt",
+          "tags": ["tee", "climbing"],
+          "status": "ACTIVE",
+          "updatedAt": "2026-09-18T11:00:00Z",
+          "seo": {"title": "", "description": ""},
+          "category": null,
+          "priceRangeV2": {"minVariantPrice": {"amount": "44.00"}, "maxVariantPrice": {"amount": "44.00"}},
+          "images": {"nodes": [{"url": "https://cdn.shop.example.com/tapper-1.jpg", "altText": "", "position": 1}]},
+          "video": {"nodes": []},
+          "metafields": {"nodes": []},
+          "variants": {"nodes": []}
+        }
+      ]
+    }
+  },
+  "extensions": {
+    "cost": {
+      "requestedQueryCost": 22,
+      "actualQueryCost": 12,
+      "throttleStatus": {"maximumAvailable": 2000.0, "currentlyAvailable": 1988.0, "restoreRate": 100.0}
+    }
+  }
+}

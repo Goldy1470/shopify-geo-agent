@@ -27,6 +27,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+asyncio_mode = "auto"
 markers = [
     "e2e: end-to-end loop tests (mock mode)",
     "slow: slow tests",

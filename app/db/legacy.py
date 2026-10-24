@@ -1,9 +1,19 @@
+"""Legacy SQLite tables (fixes queue, visibility runs, accessibility checks).
+
+Moved verbatim from app/db.py into the package in Phase 1 so the SQLAlchemy
+catalog mirror can coexist in the same SQLite file. Reads/writes the legacy
+DB_PATH global via the same module-global trick the tests monkeypatch.
+"""
+
 import contextlib
 import os
 import sqlite3
 import threading
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "geo_agent.db")
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "geo_agent.db",
+)
 
 _local = threading.local()
 
@@ -66,9 +76,15 @@ def init_db():
         """
     )
     # Migrations for databases created before the response analyzer landed.
-    for col in ("analysis_json", "sources_json"):
+    for stmt in (
+        "ALTER TABLE visibility_runs ADD COLUMN analysis_json TEXT",
+        "ALTER TABLE visibility_runs ADD COLUMN sources_json TEXT",
+        "ALTER TABLE visibility_runs ADD COLUMN mentioned_merchants TEXT",
+        "ALTER TABLE visibility_runs ADD COLUMN looks_like_shopping INTEGER DEFAULT 0",
+        "ALTER TABLE visibility_runs ADD COLUMN mentioned_brand TEXT",
+    ):
         with contextlib.suppress(sqlite3.OperationalError):
-            conn.execute(f"ALTER TABLE visibility_runs ADD COLUMN {col} TEXT")  # may exist already
+            conn.execute(stmt)
     conn.commit()
 
 
