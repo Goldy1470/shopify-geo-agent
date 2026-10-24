@@ -19,7 +19,8 @@
       <a href="/" {% if request.url.path == '/' %}class="on"{% endif %}>Overview</a>
       <a href="/products" {% if request.url.path.startswith('/products') %}class="on"{% endif %}>Products</a>
       <a href="/accessibility" {% if request.url.path.startswith('/accessibility') %}class="on"{% endif %}>Agent access</a>
-      <a href="/visibility" {% if request.url.path.startswith('/visibility') %}class="on"{% endif %}>Visibility</a>
+      <a href="/visibility" {% if request.url.path.startswith('/visibility') or request.url.path.startswith('/prompts') %}class="on"{% endif %}>Visibility</a>
+      <a href="/prompts" {% if request.url.path.startswith('/prompts') %}class="on"{% endif %}>Tracking</a>
       <a href="/fixes" {% if request.url.path.startswith('/fixes') %}class="on"{% endif %}>Fixes</a>
       <a href="/settings" {% if request.url.path.startswith('/settings') %}class="on"{% endif %}>Settings</a>
     </nav>

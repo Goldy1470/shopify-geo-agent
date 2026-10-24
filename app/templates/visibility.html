@@ -27,6 +27,7 @@
   <section>
     <h2>Log a run (paste mode)</h2>
     <p class="hint">Open ChatGPT / Muse / Instinct, ask your category's shopping prompt, and paste what the agent answered. The agent parses mentions of your SKUs and which merchants got the link.</p>
+    <p><a class="btn small ghost" href="/prompts">Track runs automatically →</a></p>
     <form method="post" action="/visibility/paste">
       <input type="hidden" name="csrf_token" value="{{ csrf }}">
       <label>Prompt used <input name="prompt" required></label>
@@ -75,6 +76,35 @@
   {% if competitor_stats %}
   <h2>Competitors seen in answers</h2>
   <ul class="issue-list">{% for name, n in competitor_stats %}<li><span class="count">{{ n }}</span> {{ name }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Per-prompt visibility (Wilson 95% CIs)</h2>
+  <p class="hint">The interval is the honest read: a 20% rate from 5 runs isn't a trend, it's noise. Ship the fixes, keep running, watch the band move up.</p>
+  {% if prompt_stats %}
+    <table>
+      <thead><tr><th>Prompt</th><th>Runs</th><th>Hits</th><th>Rate</th><th>95% CI</th></tr></thead>
+      <tbody>
+      {% for s in prompt_stats %}
+        <tr>
+          <td>{{ s.prompt }}</td>
+          <td>{{ s.runs }}</td>
+          <td>{{ s.hits }}</td>
+          <td>{{ s.rate }}%</td>
+          <td class="mono">{{ s.ci_low }}% – {{ s.ci_high }}%</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}<p>No prompt stats yet.</p>{% endif %}
+  {% if trends %}
+  <h2>Daily mention-rate trend</h2>
+  <ul class="issue-list">
+    {% for t in trends %}
+    <li><span class="count">{{ t.rate }}%</span> {{ t.day }} <span class="hint">({{ t.hits }}/{{ t.runs }} runs)</span></li>
+    {% endfor %}
+  </ul>
   {% endif %}
 </section>
 

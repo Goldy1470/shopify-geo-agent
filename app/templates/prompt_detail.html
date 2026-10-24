@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Prompt #{{ prompt.id }} - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>{{ prompt.text }} <span class="chip">{{ prompt.source }}</span></h1>
+<p class="sub"><a href="/prompts">← all prompts</a> · state: {{ 'active' if prompt.active else 'paused' }}</p>
+
+<section>
+  <h2>Recent runs ({{ runs|length }})</h2>
+  {% if runs %}
+  <table>
+    <thead><tr><th>When</th><th>Engine</th><th>Hits</th><th>Merchants</th><th>Answer</th></tr></thead>
+    <tbody>
+      {% for r in runs %}
+      <tr>
+        <td>{{ r.created_at[:19] }}</td>
+        <td>{{ r.engine }}</td>
+        <td>{{ r.mentioned_products|from_json|length }}</td>
+        <td>{{ r.mentioned_merchants|from_json|join(', ') or '—' }}</td>
+        <td class="snippet">{{ r.response_text[:180] }}{% if r.response_text|length > 180 %}…{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No runs recorded for this prompt yet — run tracking or paste a response on the visibility page.</p>
+  {% endif %}
+</section>
+{% endblock %}

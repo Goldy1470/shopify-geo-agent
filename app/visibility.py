@@ -12,6 +12,7 @@ Outputs are stored per run and rolled up into mention rates + position stats.
 """
 
 import json
+import math
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -20,6 +21,21 @@ import httpx
 
 from .db import execute, query
 from .response_analyzer import _product_tokens, _token_patterns, analyze_response
+
+
+def wilson_ci(hits: int, total: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for a proportion (0..1), e.g. a mention rate.
+
+    Small-sample friendly: 1 hit in 5 runs gets a wide interval instead of a
+    lying 20%±0. Returns (low, high) clamped to [0, 1].
+    """
+    if total <= 0:
+        return (0.0, 0.0)
+    phat = hits / total
+    denom = 1 + z * z / total
+    centre = phat + z * z / (2 * total)
+    spread = z * math.sqrt(phat * (1 - phat) / total + z * z / (4 * total * total))
+    return (max(0.0, (centre - spread) / denom), min(1.0, (centre + spread) / denom))
 
 
 def _token_match(tokens: list[str], patterns, text: str) -> tuple[bool, int]:
@@ -79,17 +95,33 @@ def extract_mentions(response_text: str, products: list[dict]) -> dict:
     }
 
 
-def save_run(prompt: str, engine: str, source: str, response_text: str, products: list[dict]) -> dict:
+def save_run(
+    prompt: str,
+    engine: str,
+    source: str,
+    response_text: str,
+    products: list[dict],
+    prompt_id: int | None = None,
+    analysis: dict | None = None,
+) -> dict:
+    """Record one run; `analysis` (from the LLM grader) overrides the regex one.
+
+    When an LLM analysis dict is passed it must already contain the regular
+    analyze_response keys (sources, source_domains, products, ...) - the
+    tracking runner merges the LLM verdict over the regex base first.
+    """
     mentions = extract_mentions(response_text, products)
-    analysis = analyze_response(prompt, response_text, products)
+    if analysis is None:
+        analysis = analyze_response(prompt, response_text, products)
     execute(
-        "INSERT INTO visibility_runs (prompt, engine, source, response_text, mentioned_products, mentioned_merchants, product_count, created_at, analysis_json, sources_json) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO visibility_runs (prompt, engine, source, response_text, mentioned_products, mentioned_merchants, product_count, created_at, analysis_json, sources_json, prompt_id) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (
             prompt, engine, source, response_text,
             json.dumps(mentions["products"]), json.dumps(mentions["merchants"]),
             len(mentions["products"]), datetime.now(UTC).isoformat(),
             json.dumps(analysis), json.dumps(analysis["sources"]),
+            prompt_id,
         ),
     )
     return {"prompt": prompt, "engine": engine, "source": source, "analysis": analysis, **mentions}
@@ -167,6 +199,38 @@ def visibility_summary(products: list[dict]) -> dict:
         first_hit = p["hits"][0]["title"] if p["hits"] else None
         if first_hit:
             top3[first_hit] = top3.get(first_hit, 0) + 1
+
+    # Per-prompt mention rates with Wilson CIs (Phase 3 aggregation).
+    by_prompt: dict[str, dict[str, int]] = {}
+    by_day: dict[str, dict[str, int]] = {}
+    for p in prompts:
+        stat = by_prompt.setdefault(p["prompt"], {"runs": 0, "hits": 0})
+        stat["runs"] += 1
+        if p["hits"]:
+            stat["hits"] += 1
+        day = p["created_at"][:10]
+        dstat = by_day.setdefault(day, {"runs": 0, "hits": 0})
+        dstat["runs"] += 1
+        if p["hits"]:
+            dstat["hits"] += 1
+    prompt_stats: list[dict[str, Any]] = []
+    for text, stat in by_prompt.items():
+        lo, hi = wilson_ci(stat["hits"], stat["runs"])
+        prompt_stats.append({
+            "prompt": text,
+            "runs": stat["runs"],
+            "hits": stat["hits"],
+            "rate": round(100 * stat["hits"] / stat["runs"]),
+            "ci_low": round(100 * lo),
+            "ci_high": round(100 * hi),
+        })
+    prompt_stats.sort(key=lambda s: (-s["hits"], -s["runs"], s["prompt"]))
+    trends = [
+        {"day": day, "runs": stat["runs"], "hits": stat["hits"],
+         "rate": round(100 * stat["hits"] / stat["runs"]) if stat["runs"] else 0}
+        for day, stat in sorted(by_day.items())
+    ][:14]
+
     return {
         "runs": prompts[:30],
         "total_runs": total_runs,
@@ -182,4 +246,6 @@ def visibility_summary(products: list[dict]) -> dict:
             for d, n in sorted(domain_totals.items(), key=lambda kv: -kv[1])[:8]
         ],
         "competitor_stats": sorted(competitor_totals.items(), key=lambda kv: -kv[1])[:8],
+        "prompt_stats": prompt_stats[:10],
+        "trends": trends,
     }

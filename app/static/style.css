@@ -88,6 +88,8 @@ a:hover { text-decoration: underline; }
 .chip-missing { color: #ff8a8a; }
 .chip-warning { color: #ffd166; }
 .chip-unchecked { color: var(--muted); }
+.snippet { color: var(--muted); font-size: 12px; max-width: 340px; }
+.engine-choice { display: inline-block; margin-right: 14px; }
 .issue-list { list-style: none; padding: 0; margin: 8px 0; }
 .issue-list li { padding: 7px 0; border-bottom: 1px solid var(--border); }
 .issue-list .count {

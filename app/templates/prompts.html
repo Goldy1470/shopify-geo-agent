@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Tracking prompts - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>Tracking prompts</h1>
+<p class="sub">The shopper-style questions you want to rank for. Each active prompt runs N=5 times per available provider; answers come only from official APIs and are labeled "API-based estimate".</p>
+
+{% if result %}
+<section class="card">
+  <h2>Last run</h2>
+  {% if result.error %}
+    <p class="sev sev-medium">{{ result.error }}</p>
+  {% else %}
+    <p><b>{{ result.run_count }}</b> runs saved
+      ({{ result.prompt_count }} prompts × {{ result.engines|length }} engine{{ 's' if result.engines|length != 1 else '' }}),
+      skipped {{ result.skipped.freshness_window }} fresh-pair runs, {{ result.skipped.daily_cap }} capped.</p>
+    {% if result.errors %}
+      <ul class="issue-list">
+        {% for e in result.errors %}<li><span class="sev sev-medium">{{ e.engine }}</span> {{ e.error }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+<section>
+  <h2>Prompt set</h2>
+  <form method="post" action="/prompts/add" class="run-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>New prompt <input name="text" placeholder="best shell jacket for rainy commuting" required></label>
+    <button class="btn">Add prompt</button>
+  </form>
+  <form method="post" action="/prompts/generate" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Generate from catalog (max) <input name="limit" value="10" size="3"></label>
+    <button class="btn ghost">Auto-generate</button>
+  </form>
+
+  {% if prompts %}
+  <table>
+    <thead><tr><th>#</th><th>Prompt</th><th>Source</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+      {% for pr in prompts %}
+      <tr>
+        <td>{{ pr.id }}</td>
+        <td><a href="/prompts/{{ pr.id }}">{{ pr.text }}</a></td>
+        <td>{{ pr.source }}</td>
+        <td>{% if pr.active %}<span class="chip">on</span>{% else %}<span class="chip chip-unchecked">off</span>{% endif %}</td>
+        <td class="inline-form">
+          <form method="post" action="/prompts/{{ pr.id }}/toggle" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <input type="hidden" name="target" value="{{ '0' if pr.active else '1' }}">
+            <button class="btn small ghost" type="submit">{{ 'Pause' if pr.active else 'Activate' }}</button>
+          </form>
+          <form method="post" action="/prompts/{{ pr.id }}/delete" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <button class="btn small ghost" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No prompts yet — add one or auto-generate from the catalog.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Run tracking now</h2>
+  <form method="post" action="/track/run" class="run-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label>Runs per prompt × engine <input name="n" value="5" size="3"></label>
+    <fieldset>
+      <legend>Engines (only ones with keys configured work)</legend>
+      {% for e in available %}
+      <label class="engine-choice"><input type="checkbox" name="engines" value="{{ e }}" checked> {{ e }}</label>
+      {% endfor %}
+      {% if not available %}<p class="hint">No provider API keys configured — configure OpenAI / Perplexity / Gemini / Anthropic keys in Settings.</p>{% endif %}
+    </fieldset>
+    <button class="btn" {% if not available %}disabled{% endif %}>Run tracking</button>
+  </form>
+  <p class="hint">Runner skips prompt × engine pairs already run inside the freshness window, randomizes order, bounds concurrency at 2, and caps runs per day (60 by default).</p>
+</section>
+{% endblock %}

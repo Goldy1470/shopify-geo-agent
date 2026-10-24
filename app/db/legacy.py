@@ -73,6 +73,13 @@ def init_db():
             product_id TEXT PRIMARY KEY,
             raw TEXT
         );
+        CREATE TABLE IF NOT EXISTS prompts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            source TEXT DEFAULT 'user',  -- user | auto
+            active INTEGER DEFAULT 1,
+            created_at TEXT
+        );
         """
     )
     # Migrations for databases created before the response analyzer landed.
@@ -82,6 +89,7 @@ def init_db():
         "ALTER TABLE visibility_runs ADD COLUMN mentioned_merchants TEXT",
         "ALTER TABLE visibility_runs ADD COLUMN looks_like_shopping INTEGER DEFAULT 0",
         "ALTER TABLE visibility_runs ADD COLUMN mentioned_brand TEXT",
+        "ALTER TABLE visibility_runs ADD COLUMN prompt_id INTEGER",
     ):
         with contextlib.suppress(sqlite3.OperationalError):
             conn.execute(stmt)

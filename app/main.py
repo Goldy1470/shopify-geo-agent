@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import db as database
+from . import tracking
 from .accessibility import run_full_check
 from .config import load_config, save_config
 from .core.security import (
@@ -286,6 +287,80 @@ async def visibility_api_run(request: Request, prompt: str = Form(...)):
     if run.get("error"):
         return JSONResponse(run, status_code=400)
     return RedirectResponse("/visibility", status_code=303)
+
+
+# --- Phase 3 TRACK: prompt sets + provider runner ------------------------------
+
+
+@app.get("/prompts", response_class=HTMLResponse)
+def prompts_page(request: Request):
+    cfg = load_config()
+    return _render(
+        request,
+        "prompts.html",
+        ctx(
+            request,
+            prompts=tracking.list_prompts(),
+            available=sorted(tracking.available_engines(cfg)),
+            result=None,
+        ),
+    )
+
+
+@app.post("/prompts/add")
+async def prompts_add(request: Request, text: str = Form(...)):
+    tracking.add_prompt(text)
+    return RedirectResponse("/prompts", status_code=303)
+
+
+@app.post("/prompts/{prompt_id}/toggle")
+async def prompts_toggle(request: Request, prompt_id: int, target: str = Form(...)):
+    tracking.set_prompt_active(prompt_id, target == "1")
+    return RedirectResponse("/prompts", status_code=303)
+
+
+@app.post("/prompts/{prompt_id}/delete")
+async def prompts_delete(request: Request, prompt_id: int):
+    tracking.delete_prompt(prompt_id)
+    return RedirectResponse("/prompts", status_code=303)
+
+
+@app.post("/prompts/generate")
+async def prompts_generate(request: Request, limit: int = Form(10)):
+    tracking.generate_prompts_from_catalog(get_catalog().list_products(), limit=min(max(limit, 1), 25))
+    return RedirectResponse("/prompts", status_code=303)
+
+
+@app.post("/track/run")
+async def track_run(request: Request, engines: list[str] = Form([]), n: int = Form(5)):
+    """Fire the tracked shopping prompts against the available providers."""
+    cfg = load_config()
+    result = await tracking.run_tracking(
+        get_catalog().list_products(), cfg,
+        engine_names=engines or None,
+        n=min(max(n, 1), 5),
+    )
+    return _render(
+        request,
+        "prompts.html",
+        ctx(
+            request,
+            prompts=tracking.list_prompts(),
+            available=sorted(tracking.available_engines(cfg)),
+            result=result,
+        ),
+    )
+
+
+@app.get("/prompts/{prompt_id}", response_class=HTMLResponse)
+def prompt_detail(request: Request, prompt_id: int):
+    prow = tracking.get_prompt(prompt_id)
+    if not prow:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    runs = database.query(
+        "SELECT * FROM visibility_runs WHERE prompt_id=? ORDER BY created_at DESC LIMIT 50", (prompt_id,)
+    )
+    return _render(request, "prompt_detail.html", ctx(request, prompt=prow, runs=runs))
 
 
 @app.get("/fixes", response_class=HTMLResponse)

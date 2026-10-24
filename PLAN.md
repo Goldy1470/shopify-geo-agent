@@ -100,14 +100,14 @@ SQLite default; `DATABASE_URL` switches to Postgres. Alembic migrations from day
 - [x] Issues carry factor/severity/evidence/fix_type
 
 ### Phase 3 — TRACK
-- [ ] Prompt sets (user + auto-generated from catalog), editable UI
-- [ ] Provider interface + 4 implementations, env-based, skip-if-no-key, cost caps
-- [ ] Runner: N=5 per prompt per provider, randomized order, bounded concurrency, resumable
-- [ ] OneGlanse analysisPrompt → Python, Pydantic output, T=0, JSON-validate + retry; deterministic
+- [x] Prompt sets (user + auto-generated from catalog), editable UI
+- [x] Provider interface + 4 implementations, env-based, skip-if-no-key, cost caps
+- [x] Runner: N=5 per prompt per provider, randomized order, bounded concurrency, resumable
+- [x] OneGlanse analysisPrompt → Python, Pydantic output, T=0, JSON-validate + retry; deterministic
       checklist guards; commerce adaptations (per-product, price/buy link, competitors)
-- [ ] Regex analyzer = offline fallback
-- [ ] Aggregation: mention rate + Wilson CIs, share of voice, top domains, trends
-- [ ] Pages: Visibility, prompt detail, competitors
+- [x] Regex analyzer = offline fallback
+- [x] Aggregation: mention rate + Wilson CIs, share of voice, top domains, trends
+- [x] Pages: Visibility, prompt detail, competitors
 
 ### Phase 4 — SUGGEST
 - [ ] Engine modes: rules/templates + LLM-judged via same provider interface
