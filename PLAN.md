@@ -93,11 +93,11 @@ SQLite default; `DATABASE_URL` switches to Postgres. Alembic migrations from day
       metafieldSet / metafieldsSet signatures, webhook topics, visibility-for-write-products scope
 
 ### Phase 2 — DIAGNOSE
-- [ ] Weights/thresholds to YAML w/ heuristic labels + source/date
-- [ ] Review threshold 787 configurable
-- [ ] Catalog readiness: taxonomy, GTIN/barcode, SEO title+desc, variant completeness,
+- [x] Weights/thresholds to YAML w/ heuristic labels + source/date
+- [x] Review threshold 787 configurable
+- [x] Catalog readiness: taxonomy, GTIN/barcode, SEO title+desc, variant completeness,
       price/availability sanity, alt text, Product JSON-LD fetch+validation
-- [ ] Issues carry factor/severity/evidence/fix_type
+- [x] Issues carry factor/severity/evidence/fix_type
 
 ### Phase 3 — TRACK
 - [ ] Prompt sets (user + auto-generated from catalog), editable UI

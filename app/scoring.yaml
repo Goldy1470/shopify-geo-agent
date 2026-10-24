@@ -1,0 +1,93 @@
+# GEO scoring configuration (v2).
+#
+# The heuristic labels are inherited from the initial audit implementation
+# (OneGlanse-derived medians, MIT; see NOTICE). Every number here is
+# editable; scoring.py falls back to embedded defaults if this file is
+# missing or unparseable so the app never hard-fails on config typos.
+#
+# last_reviewed: 2026-10-24
+
+meta:
+  name: geo-scoring
+  version: 2
+  source: "OneGlanse-derived ranking signal heuristics (MIT; see NOTICE), maintained in scoring.yaml"
+  notes: >
+    Thresholds encode medians observed on ranked-first PDPs: 787+ reviews,
+    5+ images, 3+ FAQs, 60+ word descriptions with spec checklists, fully
+    populated attribute metafields.
+
+factors:
+  title: { weight: 20 }
+  description: { weight: 25 }
+  faq: { weight: 15 }
+  media: { weight: 15 }
+  attributes: { weight: 15 }
+  reviews: { weight: 10 }
+
+grades:          # minimum total score per letter grade
+  A: 80
+  B: 60
+  C: 40
+
+thresholds:
+  title:
+    min_length: 20            # below this the title can't carry type + use case
+    max_length: 70            # engines truncate ~70 chars
+    hard_max: 90              # above this treat as stuffing
+    stuffing_segments: 5      # " - " or " | " segments >= 5 reads as spam
+    stuffed_floor_score: 4
+    short_penalty: 9
+    long_penalty: 4
+    no_type_penalty: 4
+    type_not_in_title_penalty: 2
+    no_use_case_penalty: 5
+    all_caps_penalty: 4
+
+  description:
+    thin_words: 60            # agents need prose + specs to reason with
+    thin_penalty: 12
+    short_words: 100
+    short_penalty: 4
+    topic_penalty_each: 3
+    topic_penalty_cap: 10
+    no_list_penalty: 2
+    topic_words:
+      material: [material, fabric, nylon, polyester, leather, laminate, canvas]
+      dimensions: [dimension, size, liter, litre, oz, ounce, capacity, wide, tall, kg, lb]
+      compatibility: [compat, fits, carry-on, airline, laptop, device]
+      intended_use: [designed for, ideal for, perfect for, made for, built for, use, commuting, travel]
+      limitations: [not for, not designed, do not, avoid, limitation, warning]
+
+  faq:
+    full_count: 3             # first-position PDPs carry 3+ FAQs
+    partial_score: 9
+
+  media:
+    full_images: 5
+    few_images_penalty: 2     # 3-4 images
+    single_image_penalty: 7
+    no_images_penalty: 15
+    missing_alt_penalty: 3
+    thin_alt_chars: 25        # shorter alts don't count as "described"
+    thin_alt_penalty: 2
+    no_video_penalty: 3
+
+  attributes:
+    keys: [material, dimensions, compatibility, intended_use, limitations]
+    flat_missing_count: 4     # >=4 missing adds a flat extra penalty
+    flat_missing_penalty: 2
+
+  reviews:
+    full_count: 787           # top-ranked median (configurable per phase 2)
+    full_score: 10
+    strong_count: 352         # bottom-ranked median
+    strong_score: 7
+    growing_count: 50
+    growing_score: 4
+    first_review_score: 2
+
+use_case_words:
+  [travel, commut, hik, beach, gym, weekend, rain, hiking, camping, work,
+   school, carrying, everyday, daily]
+
+attribute_keys: [material, dimensions, compatibility, intended_use, limitations]

@@ -8,20 +8,30 @@
   <section>
     <h2>Score breakdown</h2>
     <table>
-      <tr><td>Title (descriptive, use case, no keyword stuffing)</td><td><b>{{ s.breakdown.title }}/20</b></td></tr>
-      <tr><td>Description (uses, compatibility, dimensions, materials, limitations)</td><td><b>{{ s.breakdown.description }}/25</b></td></tr>
-      <tr><td>FAQ / Q&A on page</td><td><b>{{ s.breakdown.faq }}/15</b></td></tr>
-      <tr><td>Media (images, alt text, video)</td><td><b>{{ s.breakdown.media }}/15</b></td></tr>
-      <tr><td>Attribute metafields</td><td><b>{{ s.breakdown.attributes }}/15</b></td></tr>
-      <tr><td>Reviews (top-ranked median: 787)</td><td><b>{{ s.breakdown.reviews }}/10</b></td></tr>
+      <tr><td>Title (descriptive, use case, no keyword stuffing)</td><td><b>{{ s.breakdown.title }}/{{ weights.title }}</b></td></tr>
+      <tr><td>Description (uses, compatibility, dimensions, materials, limitations)</td><td><b>{{ s.breakdown.description }}/{{ weights.description }}</b></td></tr>
+      <tr><td>FAQ / Q&A on page</td><td><b>{{ s.breakdown.faq }}/{{ weights.faq }}</b></td></tr>
+      <tr><td>Media (images, alt text, video)</td><td><b>{{ s.breakdown.media }}/{{ weights.media }}</b></td></tr>
+      <tr><td>Attribute metafields</td><td><b>{{ s.breakdown.attributes }}/{{ weights.attributes }}</b></td></tr>
+      <tr><td>Reviews (top-ranked median: {{ review_floor }})</td><td><b>{{ s.breakdown.reviews }}/{{ weights.reviews }}</b></td></tr>
     </table>
 
     <h2>Issues</h2>
     {% if s.issues %}
       <ul class="issue-list">
-        {% for i in s.issues %}<li><span class="count">•</span> [{{ i.factor }}] {{ i.text }}</li>{% endfor %}
+        {% for i in s.issues %}<li><span class="sev sev-{{ i.severity }}">{{ i.severity }}</span> [{{ i.factor }}] {{ i.text }}</li>{% endfor %}
       </ul>
     {% else %}<p>Nothing to fix.</p>{% endif %}
+
+    <h2>Data readiness</h2>
+    <ul class="issue-list">
+      {% for c in ready.checks %}
+        <li>
+          <span class="chip chip-{{ c.status }}">{{ c.status }}</span>
+          <b>{{ c.check }}</b> — {{ c.detail }}
+        </li>
+      {% endfor %}
+    </ul>
   </section>
 
   <section>

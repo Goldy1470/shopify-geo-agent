@@ -20,7 +20,9 @@ from .core.security import (
 )
 from .db import execute
 from .fixer import FIX_TITLES, apply_fix, generate_fixes
-from .scoring import score_product
+from .readiness import product_readiness
+from .scoring import WEIGHTS, score_product
+from .scoring_config import load_scoring_config
 from .shopify import get_catalog
 from .shopify_client import ShopifyClient
 from .visibility import run_prompt_via_openai, save_run, visibility_summary
@@ -193,13 +195,28 @@ def product_detail(request: Request, product_id: str):
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
     scoring = score_product(p)
+    ready = product_readiness(p)
+    review_floor = load_scoring_config()["thresholds"]["reviews"]["full_count"]
     pending = database.query(
         "SELECT * FROM fixes WHERE product_id=? AND status='pending'", (product_id,)
     )
     return _render(
         request,
         "product_detail.html",
-        ctx(request, p=p, s=scoring, pending=pending, fix_titles=FIX_TITLES),
+        ctx(request, p=p, s=scoring, ready=ready, review_floor=review_floor, weights=WEIGHTS, pending=pending, fix_titles=FIX_TITLES),
+    )
+
+
+@app.get("/products/{product_id}/readiness.json")
+def product_readiness_json(product_id: str):
+    """Catalog readiness as JSON; JSON-LD is fetched only in live mode."""
+    p = get_catalog().get_product(product_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+    catalog = get_catalog()
+    live = catalog.mode == "live"
+    return JSONResponse(
+        product_readiness(p, check_jsonld=live, store_domain=load_config()["shop_domain"])
     )
 
 

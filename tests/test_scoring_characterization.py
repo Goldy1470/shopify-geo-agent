@@ -68,11 +68,14 @@ def test_stuffed_title_penalty_boundary():
     fat = {"title": "Backpack - one - two - three - four - five", "product_type": "Backpack", "body_html": "hiking"}
     v2, i2 = score_title(fat)
     assert v2 == 4
-    assert any("keyword-stuffed" in t for t in i2)
+    assert any("keyword-stuffed" in i["text"] for i in i2)
+    assert i2[0]["severity"] == "high" and i2[0]["fix_type"] == "title_rewrite"
 
 
 def test_faq_thresholds():
-    assert score_faq({"faq": []}) == (0, ["No FAQ / Q&A content on the page. Ranked-first offers include FAQs, Q&As, images, and video consistently."])
+    val, issues = score_faq({"faq": []})
+    assert val == 0
+    assert issues[0]["text"] == "No FAQ / Q&A content on the page. Ranked-first offers include FAQs, Q&As, images, and video consistently."
     v, issues = score_faq({"faq": [{"q": "q", "a": "a"}]})
     assert v == 9
     assert score_faq({"faq": [{"q": str(i), "a": "a"} for i in range(3)]})[0] == WEIGHTS["faq"]
@@ -90,5 +93,5 @@ def test_media_video_counts():
 def test_short_title_deductions():
     v, issues = score_title({"title": "Drift", "product_type": "", "body_html": "jacket"})
     assert v == 2  # 20 -9 short -4 no product_type -5 no use case
-    joined = " ".join(i for i in issues)
+    joined = " ".join(i["text"] for i in issues)
     assert "too short" in joined and "product_type" in joined

@@ -80,6 +80,14 @@ a:hover { text-decoration: underline; }
 .btn.small { padding: 6px 12px; font-size: 13px; }
 .page-actions { display: flex; justify-content: flex-end; margin: 18px 0 10px; }
 .inline-form { display: inline; }
+.sev { display: inline-block; min-width: 52px; text-align: center; border-radius: 6px; font-size: 11px; padding: 2px 4px; margin-right: 6px; background: #1c2230; }
+.sev-high { color: #ff8a8a; }
+.sev-medium { color: #ffd166; }
+.sev-low { color: #8fd694; }
+.chip { display: inline-block; min-width: 74px; text-align: center; border-radius: 6px; font-size: 11px; padding: 2px 4px; margin-right: 6px; background: #1c2230; color: #8fd694; }
+.chip-missing { color: #ff8a8a; }
+.chip-warning { color: #ffd166; }
+.chip-unchecked { color: var(--muted); }
 .issue-list { list-style: none; padding: 0; margin: 8px 0; }
 .issue-list li { padding: 7px 0; border-bottom: 1px solid var(--border); }
 .issue-list .count {
