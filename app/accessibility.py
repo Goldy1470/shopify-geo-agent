@@ -13,11 +13,9 @@ What we check (mirrors how personal agents browse):
 
 import json
 import re
-from datetime import datetime, timezone
+from typing import Any
 
 import httpx
-
-from .db import execute
 
 KNOWN_AGENTS = [
     "GPTBot", "OAI-SearchBot", "ChatGPT-User",
@@ -76,7 +74,7 @@ def check_llms_txt(url: str) -> bool:
 def check_page(url: str) -> dict:
     """Fetch raw HTML and evaluate agent-friendliness signals."""
     headers = {"User-Agent": "Mozilla/5.0 (compatible; geo-agent-audit/1.0)"}
-    checks = {
+    checks: dict[str, Any] = {
         "url": url,
         "reachable": False,
         "h1": None,
@@ -136,7 +134,6 @@ def check_page(url: str) -> dict:
     if not buttons:
         checks["notes"].append("No native <button> elements found. If add-to-cart is a <div>, agents using the accessibility tree can't activate it.")
 
-    selects = re.findall(r"<select[^>]*name=[\"']([^\"']*)[\"']|<select", html, re.I)
     unlabeled = 0
     for sel in re.findall(r"<select[^>]*>", html, re.I):
         if "aria-label" not in sel and "title=" not in sel:

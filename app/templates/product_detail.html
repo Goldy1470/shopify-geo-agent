@@ -55,7 +55,10 @@
       {% endif %}
       <div class="row">
         <button class="btn small" onclick="applyFix({{ f.id }}, this)">Approve & apply</button>
-        <form method="post" action="/fixes/{{ f.id }}/discard"><button class="btn small ghost">Discard</button></form>
+        <form method="post" action="/fixes/{{ f.id }}/discard">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <button class="btn small ghost">Discard</button>
+        </form>
       </div>
     </div>
     {% endfor %}
@@ -63,9 +66,15 @@
   </section>
 </div>
 <script>
+function csrfHeader() {
+  const m = document.cookie.match(/(?:^|;\s*)geo_csrf=([^;]+)/);
+  return m ? { 'X-CSRF-Token': m[1] } : {};
+}
 async function applyFix(id, btn) {
-  const r = await fetch(`/fixes/${id}/approve`, {method: 'POST'});
-  const j = await r.json();
+  const r = await fetch(`/fixes/${id}/approve`, {method: 'POST', headers: csrfHeader()});
+  let j = {};
+  try { j = await r.json(); } catch (_) {}
+  if (r.status === 403) { btn.textContent = 'Session expired - reload the page'; return; }
   btn.textContent = j.ok ? 'Applied ✓' : (j.error || 'Error');
   if (j.ok) setTimeout(() => window.location.reload(), 600);
 }

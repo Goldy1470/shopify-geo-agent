@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt pytest pytest-cov ruff mypy
+      - name: Lint (ruff)
+        run: python -m ruff check app tests
+      - name: Type check (mypy)
+        run: python -m mypy app
+      - name: Tests
+        run: python -m pytest --cov=app --cov-report=term --cov-report=xml

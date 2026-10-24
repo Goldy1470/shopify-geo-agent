@@ -4,8 +4,10 @@
 <h1>Fix queue</h1>
 <p class="sub">Deterministic drafts, nothing goes live until you approve it. Approve pushes the change to Shopify Admin ({{ 'mock store now' if not client_live else 'live store' }}).</p>
 
-<button class="btn" onclick="location.href='/fixes/generate'">Draft fixes for all products</button>
-
+<form method="post" action="/fixes/generate" class="inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <button class="btn">Draft fixes for all products</button>
+</form>
 <section>
   <h2>Awaiting approval ({{ pending|length }})</h2>
   {% for f in pending %}
@@ -16,7 +18,10 @@
     <div class="mono after">{{ f.after[:600] }}</div>
     <div class="row">
       <button class="btn small" onclick="applyFix({{ f.id }}, this, event)">Approve & apply</button>
-      <form method="post" action="/fixes/{{ f.id }}/discard"><button class="btn small ghost">Discard</button></form>
+      <form method="post" action="/fixes/{{ f.id }}/discard">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <button class="btn small ghost">Discard</button>
+      </form>
     </div>
   </div>
   {% else %}
@@ -35,10 +40,16 @@
 {% endif %}
 
 <script>
+function csrfHeader() {
+  const m = document.cookie.match(/(?:^|;\s*)geo_csrf=([^;]+)/);
+  return m ? { 'X-CSRF-Token': m[1] } : {};
+}
 async function applyFix(id, btn, ev) {
   if (ev) ev.stopPropagation();
-  const r = await fetch(`/fixes/${id}/approve`, {method: 'POST'});
-  const j = await r.json();
+  const r = await fetch(`/fixes/${id}/approve`, {method: 'POST', headers: csrfHeader()});
+  let j = {};
+  try { j = await r.json(); } catch (_) {}
+  if (r.status === 403) { btn.textContent = 'Session expired - reload the page'; return; }
   btn.textContent = j.ok ? 'Applied ✓' : (j.error || 'Error');
   if (j.ok) setTimeout(() => window.location.reload(), 700);
 }

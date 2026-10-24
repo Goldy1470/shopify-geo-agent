@@ -167,7 +167,7 @@ def _sources(response_text: str) -> list[dict]:
 
 def _merchants(response_text: str) -> list[str]:
     found = RETAILER_RE.findall(response_text)
-    out = []
+    out: list[str] = []
     for m in found:
         if m.lower() not in [o.lower() for o in out]:
             out.append(m.capitalize() if len(m) > 4 else m)
@@ -212,7 +212,7 @@ def _competitor_candidates(sub: str, products: list[dict], brand_present: bool) 
     out = [{"name": name, "kind": "retailer" if name.lower() in retailer_lows else "brand",
             "co_mentions": count} for name, count in ranked]
     for r in retailers:
-        if not any(o["name"].lower() == r.lower() for o in out):
+        if not any(str(o["name"]).lower() == r.lower() for o in out):
             out.append({"name": r, "kind": "retailer", "co_mentions": 0})
     return out[:8]
 
@@ -331,7 +331,7 @@ def _analyze_product(product: dict, clean: str, total_words: int) -> dict | None
     if rec in ("top_pick", "strong_alternative") and not (positives or supers):
         rec = "mentioned_only"
 
-    rank_score = {1: 100, 2: 80, 3: 65, 4: 50}.get(rank, 40 if rank else 15)
+    rank_score = {1: 100, 2: 80, 3: 65, 4: 50}.get(rank if rank else 0, 40 if rank else 15)
     rec_score = {"top_pick": 100, "strong_alternative": 80, "conditional": 60,
                  "mentioned_only": 30, "discouraged": 10, "not_mentioned": 0}[rec]
     geo = round(0.25 * visibility + 0.25 * rank_score + 0.25 * sentiment + 0.25 * rec_score)
@@ -405,10 +405,9 @@ def analyze_response(prompt: str, response_text: str, products: list[dict]) -> d
     avg_sent = round(sum(r["sentiment"] for r in results) / len(results)) if results else 50
 
     risks = []
-    if best:
-        if best["caveats"] >= 2:
-            risks.append({"severity": "warning", "type": "negative_association",
-                          "note": f"{best['title']} carries {best['caveats']} drawback cues near its mention."})
+    if best and best["caveats"] >= 2:
+        risks.append({"severity": "warning", "type": "negative_association",
+                      "note": f"{best['title']} carries {best['caveats']} drawback cues near its mention."})
     outdated = [k for k in ("discontinued", "no longer", "used to", "has been replaced") if k in clean.lower()]
     if outdated:
         risks.append({"severity": "warning", "type": "outdated_info",

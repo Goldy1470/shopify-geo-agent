@@ -13,25 +13,51 @@ Outputs are stored per run and rolled up into mention rates + position stats.
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 
 from .db import execute, query
-from .response_analyzer import analyze_response
+from .response_analyzer import _product_tokens, _token_patterns, analyze_response
+
+
+def _token_match(tokens: list[str], patterns, text: str) -> tuple[bool, int]:
+    """Whether a product's title is mentioned and the first match position.
+
+    Word-boundary regexes. >=2 distinct title tokens always match; a single token found
+    counts only when it is the title's longest token (or the title is single-word). So
+    generic 'a duffel bag' no longer summons 'Weekender Duffel - 45L - ...'.
+    """
+    matches = []
+    for tok, rx in zip(tokens, patterns, strict=False):
+        m = rx.search(text)
+        if m:
+            matches.append((tok, m.start()))
+    if not matches:
+        return False, -1
+    if len(matches) >= 2:
+        return True, min(start for _, start in matches)
+    tok, start = matches[0]
+    if len(tokens) == 1:
+        return True, start
+    return tok == max(tokens, key=len), start
 
 
 def extract_mentions(response_text: str, products: list[dict]) -> dict:
+    """Mention detection via analyzer token semantics (word boundaries).
+
+    Regression fix replaces the old any-single-word matching that flagged products on
+    generic category words.
+    """
     product_hits = []
     for p in products:
-        t = (p.get("title") or "").strip()
-        if t:
-            tokens = [w for w in re.findall(r"[A-Za-z]{4,}", t.lower()) if w not in ("with", "from", "type")]
-            distinctive = [w for w in tokens if w not in ("the", "and", "for", "pack", "kit")]
-            if distinctive and any(w in response_text.lower() for w in distinctive[:6] if len(w) >= 4):
-                idx = min((response_text.lower().find(w) for w in distinctive if w in response_text.lower() and len(w) >= 4), default=-1)
-                if idx >= 0:
-                    product_hits.append({"product_id": str(p["id"]), "title": t, "position": idx})
+        tokens = _product_tokens(p)
+        if not tokens:
+            continue
+        hit, idx = _token_match(tokens, _token_patterns(tokens), response_text)
+        if hit:
+            product_hits.append({"product_id": str(p["id"]), "title": p.get("title", ""), "position": idx})
     product_hits.sort(key=lambda h: h["position"])
 
     brand_hits = []
@@ -62,7 +88,7 @@ def save_run(prompt: str, engine: str, source: str, response_text: str, products
         (
             prompt, engine, source, response_text,
             json.dumps(mentions["products"]), json.dumps(mentions["merchants"]),
-            len(mentions["products"]), datetime.now(timezone.utc).isoformat(),
+            len(mentions["products"]), datetime.now(UTC).isoformat(),
             json.dumps(analysis), json.dumps(analysis["sources"]),
         ),
     )
@@ -103,7 +129,7 @@ def visibility_summary(products: list[dict]) -> dict:
             analysis = json.loads(r["analysis_json"]) if r["analysis_json"] else None
         except ValueError:
             analysis = None
-        sources = []
+        sources: list[Any] = []
         try:
             sources = json.loads(r["sources_json"]) if r["sources_json"] else []
         except ValueError:
@@ -136,7 +162,7 @@ def visibility_summary(products: list[dict]) -> dict:
     total_runs = len(runs)
     runs_with_hit = sum(1 for p in prompts if p["hits"])
     brand_name = (products[0].get("vendor") if products else "") or ""
-    top3 = {}
+    top3: dict[str, int] = {}
     for p in prompts:
         first_hit = p["hits"][0]["title"] if p["hits"] else None
         if first_hit:

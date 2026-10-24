@@ -5,6 +5,7 @@
 <p class="sub">Personal agents browse in a real browser and read the accessibility tree; crawlers read raw HTML and robots.txt. Check both.</p>
 
 <form method="post" action="/accessibility/run" class="run-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
   <label>Store URL <input name="store_url" placeholder="your-store.com" required></label>
   <label>Product page URL <input name="product_url" placeholder="https://your-store.com/products/aurora-pack (optional)"></label>
   <button class="btn">Run checks</button>

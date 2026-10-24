@@ -1,4 +1,4 @@
-import json
+import contextlib
 import os
 import sqlite3
 import threading
@@ -67,10 +67,8 @@ def init_db():
     )
     # Migrations for databases created before the response analyzer landed.
     for col in ("analysis_json", "sources_json"):
-        try:
-            conn.execute(f"ALTER TABLE visibility_runs ADD COLUMN {col} TEXT")
-        except sqlite3.OperationalError:
-            pass  # column already exists
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute(f"ALTER TABLE visibility_runs ADD COLUMN {col} TEXT")  # may exist already
     conn.commit()
 
 

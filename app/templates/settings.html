@@ -7,6 +7,7 @@
   <h2>Connection</h2>
   <p class="status {{ 'ok' if connection.ok else 'warn' }}">{{ connection.message }}</p>
   <form method="post" action="/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
     <label>Mode
       <select name="mode">
         <option value="mock" {% if cfg.mode == 'mock' %}selected{% endif %}>mock (sample catalog)</option>
@@ -14,12 +15,19 @@
       </select>
     </label>
     <label>Shop domain <input name="shop_domain" value="{{ cfg.shop_domain }}" placeholder="your-store.myshopify.com"></label>
-    <label>Admin API token (custom app access token) <input name="admin_api_token" type="password" value="{{ cfg.admin_api_token }}" placeholder="shpat_..."></label>
-    <label>OpenAI API key (optional, for automated visibility runs) <input name="openai_api_key" type="password" value="{{ cfg.openai_api_key }}"></label>
+    <label>Admin API token (custom app access token)
+      {% if cfg.admin_api_token %}<span class="hint">stored securely — leave blank to keep it</span>{% endif %}
+      <input name="admin_api_token" type="password" placeholder="{{ '•••••• stored — leave blank to keep' if cfg.admin_api_token else 'shpat_...' }}">
+    </label>
+    <label>OpenAI API key (optional, for automated visibility runs)
+      {% if cfg.openai_api_key %}<span class="hint">stored — leave blank to keep</span>{% endif %}
+      <input name="openai_api_key" type="password" placeholder="{{ '•••••• stored — leave blank to keep' if cfg.openai_api_key else 'sk-...' }}">
+    </label>
+    <label class="check"><input type="checkbox" name="erase_secrets"> Erase saved keys (token + API key)</label>
     <label>Brand name <input name="brand" value="{{ cfg.brand }}"></label>
     <label>Storefront URL <input name="site_url" value="{{ cfg.site_url }}" placeholder="https://your-store.com"></label>
     <button class="btn">Save</button>
   </form>
-  <p class="hint">Create a custom app in Shopify Admin &rarr; Settings &rarr; Apps &rarr; Develop apps, with read/write Products + metafields scopes. The token starts with shpat_.</p>
+  <p class="hint">Create a custom app in Shopify Admin → Settings → Apps → Develop apps, with read/write Products + metafields scopes. The token starts with <code>shpat_</code> and is stored locally in config.json; it is never rendered back to the page and never leaves your machine except in calls to Shopify/OpenAI. API version currently: {{ cfg.api_version }} (check shopify.dev for the newest stable and update it before going live).</p>
 </section>
 {% endblock %}

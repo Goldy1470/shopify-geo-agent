@@ -28,6 +28,7 @@
     <h2>Log a run (paste mode)</h2>
     <p class="hint">Open ChatGPT / Muse / Instinct, ask your category's shopping prompt, and paste what the agent answered. The agent parses mentions of your SKUs and which merchants got the link.</p>
     <form method="post" action="/visibility/paste">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
       <label>Prompt used <input name="prompt" required></label>
       <label>Engine
         <select name="engine">
@@ -42,6 +43,7 @@
     <h2>Run via ChatGPT API</h2>
     {% if cfg.openai_api_key %}
     <form method="post" action="/visibility/api-run" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
       <input name="prompt" placeholder="best waterproof travel backpack" required>
       <button class="btn small">Run</button>
     </form>

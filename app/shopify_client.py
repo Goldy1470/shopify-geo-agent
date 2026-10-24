@@ -28,13 +28,13 @@ class ShopifyClient:
         if not self.is_live:
             return self._mock
         products = []
-        url = f"https://{self.shop_domain}/admin/api/{self.api_version}/products.json?limit={limit}"
+        url: str | None = f"https://{self.shop_domain}/admin/api/{self.api_version}/products.json?limit={limit}"
         while url:
             resp = httpx.get(url, headers=self._headers(), timeout=30)
             resp.raise_for_status()
             page = resp.json()
             products.extend(page.get("products", []))
-            url = resp.links.get("next", {}).get("url")
+            url = resp.links.get("next", {}).get("url") or None
         return products
 
     def get_product(self, product_id: str) -> dict | None:
@@ -84,10 +84,10 @@ class ShopifyClient:
         existing_hits = [m for m in existing if m.get("key") == key]
         if existing_hits:
             method, url = httpx.put, f"https://{self.shop_domain}/admin/api/{self.api_version}/metafields/{existing_hits[0]['id']}.json"
-            payload = {"metafield": {"id": existing_hits[0]["id"], "value": value, "type": "json_string"}}
+            payload = {"metafield": {"id": existing_hits[0]["id"], "value": value, "type": "json"}}
         else:
             method, url = httpx.post, f"https://{self.shop_domain}/admin/api/{self.api_version}/products/{product_id}/metafields.json"
-            payload = {"metafield": {"namespace": namespace, "key": key, "value": value, "type": "json_string"}}
+            payload = {"metafield": {"namespace": namespace, "key": key, "value": value, "type": "json"}}
         resp = method(url, headers=self._headers(), json=payload, timeout=30)
         resp.raise_for_status()
 

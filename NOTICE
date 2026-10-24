@@ -1,0 +1,17 @@
+# NOTICE
+
+This project's answer-analysis methodology (rank by reading order, sentiment decision
+tree with anti-inflation caps, five-dimension visibility, recommendation ladder, GEO
+score formula with caps, competitor sharing) is adapted from OneGlanse.
+
+OneGlanse is licensed under the MIT License.
+Copyright (c) Aryaman Todkar.
+Repository: https://github.com/oneglanse/oneglanse
+
+Adaptations made here: the methodological rules are re-implemented deterministically in
+Python (no LLM required) and extended for commerce — per-product matching against a
+Shopify catalog, price/buy-link checks, itemization per SKU, and SQLite/Next-app storage.
+Nothing is ported from OneGlanse's browser-automation agent (apps/agent).
+
+Per OneGlanse's methodology prompt at:
+packages/services/src/analysis/analysisPrompt.ts

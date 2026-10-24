@@ -23,7 +23,7 @@ def load_config() -> dict:
     cfg = dict(_DEFAULTS)
     if os.path.exists(CONFIG_PATH):
         try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            with open(CONFIG_PATH, encoding="utf-8") as f:
                 stored = json.load(f)
             cfg.update({k: v for k, v in stored.items() if k in cfg})
         except (OSError, ValueError):

@@ -23,7 +23,7 @@ def _text(p: dict) -> str:
     return " ".join((body + " " + (p.get("faq_text") or "")).split())
 
 
-def _clean_title(t: str) -> str:
+def _clean_title(t: str | None) -> str:
     return re.sub(r"\s+", " ", t or "").strip()
 
 
@@ -102,7 +102,6 @@ def score_description(p: dict) -> tuple[int, list[str]]:
 
 
 def score_faq(p: dict) -> tuple[int, list[str]]:
-    issues = []
     faqs = p.get("faq") or []
     if len(faqs) >= 3:
         return WEIGHTS["faq"], []
@@ -116,7 +115,7 @@ def score_media(p: dict) -> tuple[int, list[str]]:
     images = [i for i in (p.get("images") or []) if not (i.get("src") or "").endswith(".mp4")]
     videos = [i for i in (p.get("images") or []) if (i.get("src") or "").endswith(".mp4")]
     missing_alt = [i for i in images if not (i.get("alt") or "").strip()]
-    described_alt = [i for i in images if (i.get("alt") or "").strip() and len((i.get("alt") or "")) > 25]
+    described_alt = [i for i in images if (i.get("alt") or "").strip() and len(i.get("alt") or "") > 25]
 
     s = WEIGHTS["media"]
     if len(images) >= 5:
@@ -146,7 +145,6 @@ def score_attributes(p: dict) -> tuple[int, list[str]]:
     issues = []
     mf = p.get("metafields") or {}
     missing = [k for k in ATTRIBUTE_KEYS if not (mf.get(k) or "").strip()]
-    coverage = len(ATTRIBUTE_KEYS) - len(missing)
     s = WEIGHTS["attributes"]
     if missing:
         s -= int(WEIGHTS["attributes"] * (len(missing) / len(ATTRIBUTE_KEYS))) + (2 if len(missing) >= 4 else 0)
@@ -190,7 +188,6 @@ def score_product(p: dict) -> dict:
 
     total = sum(min(v, WEIGHTS[k]) for k, v in parts.items())
     grade = "A" if total >= 80 else "B" if total >= 60 else "C" if total >= 40 else "D"
-    quick_wins = [i for i in all_issues if i["factor"] in ("faq", "title")] if total < 60 else all_issues[:3]
     return {
         "product_id": str(p["id"]),
         "title": p.get("title"),

@@ -1,0 +1,82 @@
+[project]
+name = "shopify-geo-agent"
+version = "0.2.0"
+description = "Audit, track, and fix Shopify listings so AI shopping agents recommend your products."
+requires-python = ">=3.12"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "jinja2",
+    "python-multipart",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "ruff",
+    "mypy",
+    "pre-commit",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "e2e: end-to-end loop tests (mock mode)",
+    "slow: slow tests",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["run.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = ["app/templates", "app/static", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # import order
+    "W",   # warnings
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "SIM", # simplify
+]
+ignore = [
+    "E501", # line length handled per-file basis; templates excluded
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI marks these callables immutable-safe for argument defaults.
+extend-immutable-calls = ["fastapi.Form", "fastapi.Depends", "fastapi.Query", "fastapi.File"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = false
+no_implicit_optional = true
+exclude = ["app/templates", "build", "run.py"]
+
+[[tool.mypy.overrides]]
+module = ["uvicorn.*", "httpx.*"]
+ignore_missing_imports = true
