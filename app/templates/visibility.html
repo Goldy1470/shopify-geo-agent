@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Visibility - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>AI visibility</h1>
+<p class="sub">Muse and Instinct send no referrals and don't identify themselves, so track what you can check directly: run your category's shopping prompts and log what comes back. Mention rate + position are yours to improve.</p>
+
+<div class="cards">
+  <div class="card"><div class="kpi">{{ mention_rate }}%</div><div class="label">Prompt runs where you were mentioned</div></div>
+  <div class="card"><div class="kpi">{{ total_runs }}</div><div class="label">Total runs logged</div></div>
+  {% if avg_geo is not none %}
+  <div class="card"><div class="kpi">{{ avg_geo }}</div><div class="label">Avg answer GEO score (0–100)</div></div>
+  {% endif %}
+  {% if avg_rank %}
+  <div class="card"><div class="kpi">#{{ avg_rank }}</div><div class="label">Avg first-product rank in answers</div></div>
+  {% endif %}
+</div>
+
+{% if rec_counts %}
+<div class="cards">
+  {% for rec, n in rec_counts %}
+  <div class="card"><div class="kpi small">{{ n }}</div><div class="label">{{ rec|replace('_',' ') }}</div></div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid2">
+  <section>
+    <h2>Log a run (paste mode)</h2>
+    <p class="hint">Open ChatGPT / Muse / Instinct, ask your category's shopping prompt, and paste what the agent answered. The agent parses mentions of your SKUs and which merchants got the link.</p>
+    <form method="post" action="/visibility/paste">
+      <label>Prompt used <input name="prompt" required></label>
+      <label>Engine
+        <select name="engine">
+          <option>ChatGPT</option><option>Muse</option><option>Instinct</option>
+          <option>Google AI Mode</option><option>Copilot</option><option>Perplexity</option>
+        </select>
+      </label>
+      <label>Agent response <textarea name="response_text" rows="8" required></textarea></label>
+      <button class="btn">Judge & save run</button>
+    </form>
+
+    <h2>Run via ChatGPT API</h2>
+    {% if cfg.openai_api_key %}
+    <form method="post" action="/visibility/api-run" class="row">
+      <input name="prompt" placeholder="best waterproof travel backpack" required>
+      <button class="btn small">Run</button>
+    </form>
+    {% else %}
+    <p class="hint">Add an OpenAI API key in Settings to automate runs. Brand hosts block nothing here — manual paste mode always works.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Winners so far</h2>
+    {% if product_winners %}
+      <ul class="issue-list">{% for t, n in product_winners %}<li><span class="count">{{ n }}</span> {{ t }}</li>{% endfor %}</ul>
+    {% else %}<p>No product mentions yet. Log a run to the left.</p>{% endif %}
+    <h2>Merchant extraction</h2>
+    <p class="hint">Which merchants the answers linked IBM / Walmart etc. tells you where you're winning the recommendation but losing the sale.</p>
+  </section>
+</div>
+
+<section>
+  <h2>Cited domains across runs</h2>
+  <p class="hint">Which domains the engines cite when answering your category. Reddit-heavy answers ("which domains does the engine trust") tell you where GEO efforts must land.</p>
+  {% if domain_stats %}
+    <ul class="issue-list">
+      {% for d in domain_stats %}
+      <li><span class="count">{{ d.count }}</span> {{ d.domain }} <span class="hint">({{ d.share }}% of citations)</span></li>
+      {% endfor %}
+    </ul>
+  {% else %}<p>No citations captured yet.</p>{% endif %}
+  {% if competitor_stats %}
+  <h2>Competitors seen in answers</h2>
+  <ul class="issue-list">{% for name, n in competitor_stats %}<li><span class="count">{{ n }}</span> {{ name }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Recent runs</h2>
+  {% if runs %}
+    {% for r in runs %}
+    <details>
+      <summary>
+        <b>{{ r.engine }}</b> — "{{ r.prompt }}" —
+        {% if r.hits %}<span class="ok">YOUR PRODUCTS: {{ r.hits|length }}</span>{% else %}<span class="bad">not mentioned</span>{% endif %}
+        {% if r.analysis %}
+          · GEO {{ r.analysis.geo_score }}
+          {% if r.analysis.rank %}· rank #{{ r.analysis.rank }}{% endif %}
+          · {{ r.analysis.recommendation|replace('_',' ') }}
+        {% endif %}
+        ({{ r.created_at[:19] }})
+      </summary>
+      <div class="mono">{{ r.response_text[:1200] }}</div>
+      {% if r.analysis %}
+        <div class="analysis">
+          {% if r.analysis.risks %}
+            <p>
+            {% for risk in r.analysis.risks %}
+              <span class="bad">{{ risk.type }}</span> {{ risk.note }}
+            {% endfor %}
+            </p>
+          {% endif %}
+          {% if r.analysis.products %}
+            <table class="mini">
+              <tr><th>Product</th><th>Rank</th><th>GEO</th><th>Visibility</th><th>Sentiment</th><th>Verdict</th></tr>
+              {% for pr in r.analysis.products %}
+              <tr>
+                <td>{{ pr.title }}</td>
+                <td>{% if pr.rank %}#{{ pr.rank }}{% else %}—{% endif %}</td>
+                <td>{{ pr.geo_score }}</td>
+                <td>{{ pr.visibility }}</td>
+                <td>{{ pr.sentiment }}</td>
+                <td>{{ pr.recommendation|replace('_',' ') }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          {% endif %}
+          {% if r.analysis.competitors %}
+            <p class="hint">Co-mentioned: {% for c in r.analysis.competitors %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+          {% endif %}
+          {% if r.sources %}
+            <p class="hint">Cites: {% for s in r.sources[:6] %}{{ s.domain }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </details>
+    {% endfor %}
+  {% else %}<p>No runs logged yet.</p>{% endif %}
+</section>
+{% endblock %}

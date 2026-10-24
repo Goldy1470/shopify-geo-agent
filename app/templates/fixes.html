@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Fixes - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>Fix queue</h1>
+<p class="sub">Deterministic drafts, nothing goes live until you approve it. Approve pushes the change to Shopify Admin ({{ 'mock store now' if not client_live else 'live store' }}).</p>
+
+<button class="btn" onclick="location.href='/fixes/generate'">Draft fixes for all products</button>
+
+<section>
+  <h2>Awaiting approval ({{ pending|length }})</h2>
+  {% for f in pending %}
+  <div class="fix">
+    <div class="fix-head">{{ fix_titles[f.kind] }} · <a href="/products/{{ f.product_id }}">{{ by_product.get(f.product_id) }}</a></div>
+    <div class="mono before">{{ f.before[:200] if f.before }}</div>
+    <div class="arrow">↓</div>
+    <div class="mono after">{{ f.after[:600] }}</div>
+    <div class="row">
+      <button class="btn small" onclick="applyFix({{ f.id }}, this, event)">Approve & apply</button>
+      <form method="post" action="/fixes/{{ f.id }}/discard"><button class="btn small ghost">Discard</button></form>
+    </div>
+  </div>
+  {% else %}
+  <p>Queue empty. Hit "Draft fixes" above.</p>
+  {% endfor %}
+</section>
+
+{% if applied %}
+<section>
+  <h2>Recently applied</h2>
+  <table>
+    <thead><tr><th>Kind</th><th>Product</th><th>Applied</th></tr></thead>
+    <tbody>{% for f in applied %}<tr><td>{{ fix_titles.get(f.kind, f.kind) }}</td><td>{{ f.product_id }}</td><td>{{ (f.applied_at or '')[:19] }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endif %}
+
+<script>
+async function applyFix(id, btn, ev) {
+  if (ev) ev.stopPropagation();
+  const r = await fetch(`/fixes/${id}/approve`, {method: 'POST'});
+  const j = await r.json();
+  btn.textContent = j.ok ? 'Applied ✓' : (j.error || 'Error');
+  if (j.ok) setTimeout(() => window.location.reload(), 700);
+}
+</script>
+{% endblock %}

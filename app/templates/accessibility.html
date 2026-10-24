@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Agent access - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>Can agents use your store?</h1>
+<p class="sub">Personal agents browse in a real browser and read the accessibility tree; crawlers read raw HTML and robots.txt. Check both.</p>
+
+<form method="post" action="/accessibility/run" class="run-form">
+  <label>Store URL <input name="store_url" placeholder="your-store.com" required></label>
+  <label>Product page URL <input name="product_url" placeholder="https://your-store.com/products/aurora-pack (optional)"></label>
+  <button class="btn">Run checks</button>
+</form>
+
+<section>
+  <h2>Previous checks</h2>
+  {% if history %}
+  <table>
+    <thead><tr><th>When</th><th>Store</th><th>Agents allowed</th><th>Blocked</th><th>llms.txt</th></tr></thead>
+    <tbody>
+      {% for h in history %}
+      <tr>
+        <td>{{ h.created_at[:19] }}</td>
+        <td>{{ h.url }}</td>
+        <td>{{ h.result|allowed_count }}</td>
+        <td>{{ h.result|blocked_list }}</td>
+        <td>{{ 'yes' if h.result|llms else 'no' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="sub">Agents checked: OpenAI (GPTBot, OAI-SearchBot, ChatGPT-User), PerplexityBot, ClaudeBot, meta-webindexer / Meta-ExternalAgent (Muse), Amazonbot, Applebot-Extended, Google-Extended.</p>
+  {% else %}
+  <p>No checks yet.</p>
+  {% endif %}
+</section>
+
+<p class="hint">Tip: with a live store, run this with a real product URL. In mock mode use it against your existing live domain to see how crawlers see it today.</p>
+{% endblock %}

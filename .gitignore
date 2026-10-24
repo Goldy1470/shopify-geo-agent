@@ -1,0 +1,14 @@
+# local secrets & state
+config.json
+geo_agent.db
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# logs & junk
+*.log
+.DS_Store
+Thumbs.db

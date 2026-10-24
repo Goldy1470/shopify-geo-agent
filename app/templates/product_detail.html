@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }} - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>{{ p.title }} <span class="score sc{{ s.grade }}">{{ s.score }} · {{ s.grade }}</span></h1>
+<p class="sub">/products/{{ p.handle }}</p>
+
+<div class="grid2">
+  <section>
+    <h2>Score breakdown</h2>
+    <table>
+      <tr><td>Title (descriptive, use case, no keyword stuffing)</td><td><b>{{ s.breakdown.title }}/20</b></td></tr>
+      <tr><td>Description (uses, compatibility, dimensions, materials, limitations)</td><td><b>{{ s.breakdown.description }}/25</b></td></tr>
+      <tr><td>FAQ / Q&A on page</td><td><b>{{ s.breakdown.faq }}/15</b></td></tr>
+      <tr><td>Media (images, alt text, video)</td><td><b>{{ s.breakdown.media }}/15</b></td></tr>
+      <tr><td>Attribute metafields</td><td><b>{{ s.breakdown.attributes }}/15</b></td></tr>
+      <tr><td>Reviews (top-ranked median: 787)</td><td><b>{{ s.breakdown.reviews }}/10</b></td></tr>
+    </table>
+
+    <h2>Issues</h2>
+    {% if s.issues %}
+      <ul class="issue-list">
+        {% for i in s.issues %}<li><span class="count">•</span> [{{ i.factor }}] {{ i.text }}</li>{% endfor %}
+      </ul>
+    {% else %}<p>Nothing to fix.</p>{% endif %}
+  </section>
+
+  <section>
+    <h2>Catalog feed snapshot</h2>
+    <table>
+      <tr><td>Product type</td><td>{{ p.product_type or '<span class=bad>missing</span>' }}</td></tr>
+      <tr><td>Tags</td><td>{{ p.tags or '<span class=bad>none</span>' }}</td></tr>
+      <tr><td>Status</td><td>{{ p.status }}</td></tr>
+      <tr><td>Reviews</td><td>{{ p.reviews.count }} (★ {{ p.reviews.avg }})</td></tr>
+    </table>
+    <h3>Attributes</h3>
+    <table>
+      {% for k in ['material','dimensions','compatibility','intended_use','limitations'] %}
+      <tr><td>{{ k }}</td><td>{{ p.metafields.get(k) or '<span class=bad>missing</span>' }}</td></tr>
+      {% endfor %}
+    </table>
+
+    {% if pending %}
+    <h2>Draft fixes ({{ pending|length }})</h2>
+    {% for f in pending %}
+    <div class="fix">
+      <div class="fix-head">{{ fix_titles[f.kind] }}</div>
+      {% if f.kind != 'faq_generate' %}
+        <div class="mono before">{{ f.before[:300] }}</div>
+        <div class="arrow">↓</div>
+        <div class="mono after">{{ f.after[:600] }}</div>
+      {% else %}
+        {% for item in f.b|from_json %}
+          <div class="mono after">Q: {{ item.q }} — A: {{ item.a }}</div>
+        {% endfor %}
+      {% endif %}
+      <div class="row">
+        <button class="btn small" onclick="applyFix({{ f.id }}, this)">Approve & apply</button>
+        <form method="post" action="/fixes/{{ f.id }}/discard"><button class="btn small ghost">Discard</button></form>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </section>
+</div>
+<script>
+async function applyFix(id, btn) {
+  const r = await fetch(`/fixes/${id}/approve`, {method: 'POST'});
+  const j = await r.json();
+  btn.textContent = j.ok ? 'Applied ✓' : (j.error || 'Error');
+  if (j.ok) setTimeout(() => window.location.reload(), 600);
+}
+</script>
+{% endblock %}

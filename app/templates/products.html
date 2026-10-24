@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Products - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>Product audit</h1>
+<p class="sub">Scored against the ranking signals AI shopping engines actually respond to: descriptive titles with use cases, complete PDPs (uses, compatibility, dimensions, materials, limitations), FAQs, photos + video, review volume, and feed attributes.</p>
+<table>
+  <thead><tr>
+    <th>Product</th><th>Score</th><th>Grade</th><th>Title</th><th>Desc</th><th>FAQ</th>
+    <th>Media</th><th>Attrs</th><th>Reviews</th><th>Issue count</th>
+  </tr></thead>
+  <tbody>
+  {% for s in scored %}
+    <tr>
+      <td><a href="/products/{{ s.product_id }}">{{ s.title }}</a></td>
+      <td><span class="score sc{{ s.grade }}">{{ s.score }}</span></td>
+      <td>{{ s.grade }}</td>
+      <td>{{ s.breakdown.title }}/20</td>
+      <td>{{ s.breakdown.description }}/25</td>
+      <td>{{ s.breakdown.faq }}/15</td>
+      <td>{{ s.breakdown.media }}/15</td>
+      <td>{{ s.breakdown.attributes }}/15</td>
+      <td>{{ s.breakdown.reviews }}/10</td>
+      <td>{{ s.issues|length }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,14 @@
+{
+  "shop_domain": "your-store.myshopify.com",
+  "admin_api_token": "shpat_... (from a Shopify Admin custom app)",
+  "api_version": "2025-10",
+  "mode": "mock",
+  "openai_api_key": "",
+  "brand": "Your Brand",
+  "site_url": "https://your-store.com",
+  "category_prompts": [
+    "best waterproof travel backpack for rainy weather",
+    "rain jacket for city commuting",
+    "durable weekender bag under $200"
+  ]
+}

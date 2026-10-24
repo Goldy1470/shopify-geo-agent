@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Overview - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>Store GEO overview</h1>
+<p class="sub">How well your catalog ranks in AI shopping results and personal agents (Muse, Instinct, ChatGPT Shopping).</p>
+
+<section class="cards">
+  <div class="card big">
+    <div class="kpi">{{ avg }}</div>
+    <div class="label">Average product score</div>
+  </div>
+  <div class="card">
+    <div class="kpi">{{ product_count }}</div>
+    <div class="label">Products in catalog</div>
+  </div>
+  <div class="card">
+    <div class="kpi grades">{% for g in ['A','B','C','D'] %}<span class="g{{ g }}">{{ g }}: {{ grades[g] }}</span>{% endfor %}</div>
+    <div class="label">Score distribution</div>
+  </div>
+  <div class="card">
+    <div class="kpi">{{ pending }}</div>
+    <div class="label">Fixes awaiting approval</div>
+    <a class="btn small" href="/fixes">Review fixes</a>
+  </div>
+  <div class="card">
+    <div class="kpi">{{ vis.mention_rate }}%</div>
+    <div class="label">AI mention rate ({{ vis.total_runs }} runs)</div>
+    <a class="btn small" href="/visibility">Log prompts</a>
+  </div>
+</section>
+
+<section>
+  <h2>Worst products first</h2>
+  <table>
+    <thead><tr><th>Product</th><th>Score</th><th>Grade</th><th>Top issues</th></tr></thead>
+    <tbody>
+    {% for s in scored[:6] %}
+      <tr>
+        <td><a href="/products/{{ s.product_id }}">{{ s.title }}</a></td>
+        <td><span class="score sc{{ s.grade }}">{{ s.score }}</span></td>
+        <td>{{ s.grade }}</td>
+        <td class="issues">{{ (s.issues[0].text if s.issues else '-') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <a class="btn" href="/products">Full product audit</a>
+</section>
+
+<section>
+  <h2>What the engines keep hitting you on</h2>
+  <ul class="issue-list">
+    {% for text, count in top_issues %}
+      <li><span class="count">{{ count }}</span> {{ text }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}
