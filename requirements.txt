@@ -3,3 +3,7 @@ uvicorn
 httpx
 jinja2
 python-multipart
+pyyaml
+sqlalchemy>=2.0
+alembic
+mcp>=2,<3

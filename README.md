@@ -22,6 +22,23 @@ Runs in **mock mode** (sample catalog) until you connect a real store.
 3. Install and copy the **access token** (starts with `shpat_`)
 4. In the dashboard → **Settings** → set Mode to `live`, add your `*.myshopify.com` domain + token
 
+## Use it from Claude/Cursor (built-in MCP server)
+
+The app ships an MCP server, so an AI client can connect the store, audit, track, draft and
+apply fixes in one conversation. Mock mode works with zero setup.
+
+- **stdio** (Claude Desktop, Cursor, VS Code): `python -m app.mcp_server`
+- **HTTP**: `http://127.0.0.1:8000/mcp` on the running web app (loopback-only by default;
+  set `MCP_TOKEN` for non-local clients)
+
+Full setup configs, tool list, security notes and troubleshooting: [docs/MCP.md](docs/MCP.md).
+
+```text
+You: Connect my Shopify store — walk me through the token setup.
+You: Audit the catalog and show me the five worst products.
+You: Draft fixes, show me the diffs, and apply only what I approve.
+```
+
 ## Modules
 
 | Page       | What it does |

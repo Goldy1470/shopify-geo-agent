@@ -6,9 +6,10 @@ CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 _DEFAULTS = {
     "shop_domain": "",
     "admin_api_token": "",
-    "api_version": "2025-10",
+    "api_version": "2026-10",
     "mode": "mock",  # mock | live
     "openai_api_key": "",
+    "mcp_token": "",  # optional bearer token for non-local MCP HTTP clients
     "brand": "Nimbus Outfitters",
     "site_url": "",
     "category_prompts": [

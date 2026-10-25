@@ -1,4 +1,6 @@
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
@@ -21,6 +23,7 @@ from .core.security import (
 )
 from .db import execute
 from .fixer import FIX_TITLES, apply_fix, generate_fixes
+from .mcp_server import http_endpoint as mcp_http_endpoint
 from .readiness import product_readiness
 from .scoring import WEIGHTS, score_product
 from .scoring_config import load_scoring_config
@@ -96,11 +99,21 @@ async def csrf_guard(request: Request):
         raise HTTPException(status_code=403, detail="Missing or invalid CSRF token")
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Initialize both databases, then run the MCP HTTP transport for the app's lifetime."""
+    database.init_db()
+    database.create_all()
+    async with mcp_http_endpoint.lifespan():
+        yield
+
+
 # CSRF is enforced on all state-changing routes (double-submit cookie + Origin check).
 app = FastAPI(
     title="Shopify GEO Agent",
     version="0.2.0",
     dependencies=[Depends(csrf_guard)],
+    lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -119,12 +132,6 @@ async def csrf_cookie_middleware(request: Request, call_next):
             CSRF_COOKIE, token, samesite="lax", httponly=False, max_age=60 * 60 * 24 * 7
         )
     return response
-
-
-@app.on_event("startup")
-def startup():
-    database.init_db()
-    database.create_all()
 
 
 def ctx(request: Request, **extra):
@@ -422,6 +429,7 @@ async def settings_save(
     mode: str = Form("mock"),
     admin_api_token: str = Form(""),
     openai_api_key: str = Form(""),
+    mcp_token: str = Form(""),
     brand: str = Form(""),
     site_url: str = Form(""),
     erase_secrets: str = Form(""),
@@ -434,16 +442,25 @@ async def settings_save(
         admin_api_token = cfg["admin_api_token"]
     if not openai_api_key and cfg.get("openai_api_key") and keep:
         openai_api_key = cfg["openai_api_key"]
+    if not mcp_token and cfg.get("mcp_token") and keep:
+        mcp_token = cfg["mcp_token"]
     if erase_secrets == "on":
         admin_api_token = ""
         openai_api_key = ""
+        mcp_token = ""
     updates = {
         "shop_domain": shop_domain,
         "mode": mode,
         "admin_api_token": admin_api_token,
         "openai_api_key": openai_api_key,
+        "mcp_token": mcp_token,
         "brand": brand,
         "site_url": site_url,
     }
     save_config(updates)
     return RedirectResponse("/settings", status_code=303)
+
+
+# Mounted last: Mount("/") matches every remaining path, and the MCP app owns /mcp.
+# The guard inside http_endpoint allows loopback clients and requires a bearer token remotely.
+app.mount("/", mcp_http_endpoint)
