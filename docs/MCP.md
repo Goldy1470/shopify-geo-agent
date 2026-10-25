@@ -169,12 +169,19 @@ itself, delete the custom app in Shopify admin.
 | `visibility_summary` | read | Mention rate, Wilson CIs, per-prompt stats, sources, competitors, trends |
 | `generate_fixes` | write (queue only) | Draft impact-prioritized suggestions (auto drafts + manual tasks); nothing goes live |
 | `list_fixes` | read | Impact-ordered fixes with before/after previews, severity, auto/manual flag |
-| `apply_fix` | **write to Shopify** | Apply one approved auto-draft; refuses stale, manual and unsupported kinds |
+| `dry_run_fix` | read | Validators + staleness + write plan for one fix, no write |
+| `apply_fix` | **write to Shopify** | Dry-run → snapshot → write → read-back → audit for one approved fix |
+| `apply_fixes` | **write to Shopify** | Bulk-apply approved ids in rate-limit-aware chunks; stops early on throttle |
+| `rollback_fix` | **write to Shopify** | Restore one fix's pre-apply snapshot (refuses newer merchant edits) |
+| `rollback_batch` | **write to Shopify** | Restore every still-applied fix in a batch, newest first |
+| `apply_audit` | read | Append-only apply/refusal/rollback audit rows |
 | `discard_fix` | write | Drop a queued fix without touching the store |
 
-Writes are explicit tool calls. `generate_fixes` only queues drafts; `apply_fix` is the
-approval gate and applies exactly one fix id at a time. It re-checks that the live field
-still matches the draft (staleness check) and refuses to overwrite a merchant's newer edit.
+Writes are explicit tool calls. `generate_fixes` only queues drafts; `apply_fix` and
+`apply_fixes` are the approval gates. Each write re-checks the live field (staleness),
+stores a snapshot, verifies the result by read-back, and logs to the audit table. A
+read-back mismatch triggers an automatic restore. Rollback refuses when the merchant
+changed the field after our write unless an explicit API caller passes `force=True`.
 Manual tasks (alt text, SEO, taxonomy, GTIN, variants, price, media, JSON-LD, review nudges)
 are returned with `auto: 0` and cannot be applied through the API in this phase.
 
@@ -186,6 +193,7 @@ You: Connect my store — guide me through the Shopify token setup.
 You: Audit the catalog and show me the five worst products.
 You: Generate fixes, but don't apply anything yet. Show me the title diffs.
 You: Apply fix 12. Then show me the updated product.
+You: Dry-run fix 14, apply it, then roll it back and show the audit log.
 You: Which prompts are we tracking? Add "best waterproof backpack for travel".
 You: Run tracking for the prompts we have keys for, then summarize visibility.
 ```

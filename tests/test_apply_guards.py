@@ -118,12 +118,12 @@ def test_apply_faq_rejects_invalid_json():
     fix = _seed("faq_generate", "faq", "[]", "not json")
     result = apply_fix(Client(), fix)
     assert result["ok"] is False
-    assert result["error"] == "invalid_after"
+    assert result["error"] == "invalid_draft"
 
     not_list = _seed("faq_generate", "faq", "[]", '{"q": "x"}')
     result = apply_fix(Client(), not_list)
     assert result["ok"] is False
-    assert result["error"] == "invalid_after"
+    assert result["error"] == "invalid_draft"
 
 
 def test_apply_surfaces_write_failures():

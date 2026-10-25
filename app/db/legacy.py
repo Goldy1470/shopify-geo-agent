@@ -55,7 +55,36 @@ def init_db():
             severity TEXT,
             auto INTEGER,
             notes TEXT,
-            judge TEXT
+            judge TEXT,
+            snapshot TEXT,
+            batch_id TEXT,
+            rolled_back_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS apply_batches (
+            id TEXT PRIMARY KEY,
+            created_at TEXT,
+            finished_at TEXT,
+            status TEXT,
+            total INTEGER,
+            applied INTEGER,
+            failed INTEGER,
+            note TEXT
+        );
+        CREATE TABLE IF NOT EXISTS apply_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id TEXT,
+            fix_id INTEGER,
+            product_id TEXT,
+            kind TEXT,
+            field TEXT,
+            action TEXT,
+            status TEXT,
+            before_hash TEXT,
+            after_hash TEXT,
+            readback_hash TEXT,
+            snapshot TEXT,
+            error TEXT,
+            created_at TEXT
         );
         CREATE TABLE IF NOT EXISTS visibility_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,9 +129,16 @@ def init_db():
         "ALTER TABLE fixes ADD COLUMN auto INTEGER",
         "ALTER TABLE fixes ADD COLUMN notes TEXT",
         "ALTER TABLE fixes ADD COLUMN judge TEXT",
+        "ALTER TABLE fixes ADD COLUMN snapshot TEXT",
+        "ALTER TABLE fixes ADD COLUMN batch_id TEXT",
+        "ALTER TABLE fixes ADD COLUMN rolled_back_at TEXT",
     ):
         with contextlib.suppress(sqlite3.OperationalError):
             conn.execute(stmt)
+    # Indexes depend on columns added by the migrations above, so create them
+    # only after every ALTER has run (older DBs lack batch_id until then).
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_apply_audit_created ON apply_audit(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_fixes_batch ON fixes(batch_id)")
     conn.commit()
 
 

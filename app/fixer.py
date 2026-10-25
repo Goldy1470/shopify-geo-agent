@@ -12,7 +12,6 @@ Hard rules (enforced by validators, not convention):
   (staleness check) so a merchant's live edits are never silently overwritten.
 """
 
-import hashlib
 import html
 import json
 import re
@@ -212,107 +211,11 @@ APPLY_FIELD = {
 }
 
 
-def _sha(value: str | None) -> str:
-    return hashlib.sha256((value or "").encode("utf-8")).hexdigest()
-
-
-def _current_remote_state(client, fix) -> str | None:
-    """Current value hash of the field this fix touches, straight from the client."""
-    kind = fix["kind"]
-    field = APPLY_FIELD.get(kind)
-    if field:
-        product = client.get_product(fix["product_id"])
-        if product is None:
-            return None
-        return _sha(product.get(field))
-    if kind == "faq_generate":
-        current = client.get_product_metafield(fix["product_id"])
-        return _sha(json.dumps(current or [], sort_keys=True))
-    return None
-
-
-def _draft_state_hash(fix) -> str:
-    if fix["kind"] == "faq_generate":
-        try:
-            return _sha(json.dumps(json.loads(fix["before"] or "[]"), sort_keys=True))
-        except ValueError:
-            return _sha(fix["before"] or "")
-    return _sha(fix["before"] or "")
-
-
 def apply_fix(client, fix_id: int) -> dict:
-    """Apply one approved fix. Staleness of the remote field refuses the write."""
-    rows = query("SELECT * FROM fixes WHERE id=?", (fix_id,))
-    if not rows:
-        return {"ok": False, "error": "not found"}
-    fix = rows[0]
+    """Backward-compatible entry point; Phase 5 pipeline lives in app.apply."""
+    from .apply import apply_fix as _apply_fix
 
-    if fix["status"] != "pending":
-        return {"ok": False, "error": "not_pending", "status": fix["status"]}
-
-    if fix["kind"] not in APPLICABLE_KINDS:
-        return {
-            "ok": False,
-            "error": "unsupported_kind",
-            "note": (
-                f"'{fix['kind']}' is a merchant task in this phase; it is not written "
-                "automatically. Copy the suggestion into Shopify admin."
-            ),
-        }
-
-    # Legacy rows predate the auto column (NULL); only an explicit 0 marks a
-    # manual task. Manual tasks have no draft and must never be written.
-    if fix["auto"] == 0 or not (fix["after"] or "").strip():
-        return {
-            "ok": False,
-            "error": "unsupported_kind",
-            "note": "Manual task: there is no auto-draft to write. Copy the note into Shopify admin.",
-        }
-
-    try:
-        judge_verdict = json.loads(fix["judge"] or "{}").get("verdict")
-    except (TypeError, ValueError):
-        judge_verdict = None
-    if judge_verdict == "reject":
-        return {
-            "ok": False,
-            "error": "judge_rejected",
-            "note": "The optional LLM judge rejected this draft. Re-draft or edit it by hand.",
-        }
-
-    current = _current_remote_state(client, fix)
-    expected = _draft_state_hash(fix)
-    if current is None:
-        return {"ok": False, "error": "stale", "note": "Product no longer exists in the catalog."}
-    if current != expected:
-        return {
-            "ok": False,
-            "error": "stale",
-            "note": "The live field changed since this fix was drafted. Re-draft instead of overwriting.",
-        }
-
-    if fix["kind"] == "faq_generate":
-        # FAQs aren't a native product field; store the approved set in the
-        # geo_agent.faq_json metafield (type "json") for a theme block to render.
-        try:
-            merge = json.loads(fix["after"])
-        except (TypeError, ValueError):
-            return {"ok": False, "error": "invalid_after", "note": "FAQ draft is not valid JSON."}
-        if not isinstance(merge, list):
-            return {"ok": False, "error": "invalid_after", "note": "FAQ draft must be a JSON list."}
-        result = client.set_product_metafield(fix["product_id"], merge)
-        if isinstance(result, dict) and result.get("ok") is False:
-            return {"ok": False, "error": "write_failed", "note": "; ".join(result.get("errors") or [])}
-        execute("UPDATE fixes SET status='applied', applied_at=? WHERE id=?", (now_iso(), fix_id))
-        return {"ok": True, "note": "FAQ items saved to metafield geo_agent.faq_json."}
-    field = APPLY_FIELD.get(fix["kind"])
-    if not field:
-        return {"ok": False, "error": "unsupported_kind"}
-    result = client.update_product(fix["product_id"], {field: fix["after"]})
-    if isinstance(result, dict) and result.get("ok") is False:
-        return {"ok": False, "error": "write_failed", "note": "; ".join(result.get("errors") or [])}
-    execute("UPDATE fixes SET status='applied', applied_at=? WHERE id=?", (now_iso(), fix_id))
-    return {"ok": True, "note": f"Updated {field} in Shopify."}
+    return _apply_fix(client, fix_id)
 
 
 def now_iso() -> str:

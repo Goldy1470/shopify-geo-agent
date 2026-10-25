@@ -27,6 +27,11 @@ EXPECTED_TOOLS = {
     "generate_fixes",
     "list_fixes",
     "apply_fix",
+    "dry_run_fix",
+    "apply_fixes",
+    "rollback_fix",
+    "rollback_batch",
+    "apply_audit",
     "discard_fix",
 }
 
@@ -90,6 +95,8 @@ async def test_tool_surface_and_annotations():
     assert by_name["store_status"].annotations.read_only_hint is True
     assert by_name["apply_fix"].annotations.read_only_hint is False
     assert by_name["apply_fix"].annotations.destructive_hint is False
+    assert by_name["dry_run_fix"].annotations.read_only_hint is True
+    assert by_name["apply_audit"].annotations.read_only_hint is True
 
 
 async def test_in_memory_client_calls_a_tool(seeded):
@@ -355,6 +362,49 @@ def test_apply_fix_not_found(seeded):
 
 def test_list_fixes_rejects_unknown_status(seeded):
     assert mcp_server.list_fixes(status="bogus")["ok"] is False
+
+
+def test_dry_run_apply_rollback_and_audit_tools(seeded):
+    mcp_server.generate_fixes()
+    pending = mcp_server.list_fixes()["fixes"]
+    fix = next(f for f in pending if f["applicable"] and f["kind"] == "title_rewrite")
+
+    plan = mcp_server.dry_run_fix(fix["id"])
+    assert plan["ok"] is True
+    assert plan["would_snapshot"] is True
+
+    applied = mcp_server.apply_fix(fix["id"])
+    assert applied["ok"] is True, applied
+    assert applied["audit_id"]
+    assert applied["rollback_available"] is True
+    assert mcp_server.list_fixes(status="applied")["count"] >= 1
+
+    rolled = mcp_server.rollback_fix(fix["id"])
+    assert rolled["ok"] is True, rolled
+    assert mcp_server.list_fixes(status="rolled_back")["count"] == 1
+
+    audit = mcp_server.apply_audit(limit=10)
+    assert audit["count"] >= 2
+    assert audit["rows"][0]["action"] == "rollback"
+    assert any(row["action"] == "apply" and row["status"] == "ok" for row in audit["rows"])
+
+
+def test_bulk_apply_and_batch_rollback_tools(seeded):
+    mcp_server.generate_fixes()
+    fixes = [f for f in mcp_server.list_fixes()["fixes"] if f["applicable"]][:2]
+    assert len(fixes) == 2
+
+    applied = mcp_server.apply_fixes([f["id"] for f in fixes])
+    assert applied["ok"] is True, applied
+    assert applied["applied"] == 2
+    assert applied["batch_id"]
+
+    rolled = mcp_server.rollback_batch(applied["batch_id"])
+    assert rolled["ok"] is True, rolled
+    assert rolled["rolled_back"] == 2
+    audit = mcp_server.apply_audit(limit=20, batch_id=applied["batch_id"])
+    assert audit["count"] >= 4
+    assert {row["action"] for row in audit["rows"]} == {"apply", "rollback"}
 
 
 # --- HTTP transport ----------------------------------------------------------

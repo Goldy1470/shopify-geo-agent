@@ -119,9 +119,9 @@ SQLite default; `DATABASE_URL` switches to Postgres. Alembic migrations from day
 - [x] Impact score = visibility gap × revenue weight × fix confidence; diffs in UI
 
 ### Phase 5 — APPLY
-- [ ] Approval queue: single/bulk, edit-before-approve, discard
-- [ ] dry-run → staleness → snapshot → GraphQL write → read-back → audit log
-- [ ] one-click rollback, rollback after partial-failure, bulk batching (rate-limit aware)
+- [x] Approval queue: single/bulk, edit-before-approve, discard
+- [x] dry-run → staleness → snapshot → GraphQL write → read-back → audit log
+- [x] one-click rollback, rollback after partial-failure, bulk batching (rate-limit aware)
 
 ### Phase 6 — VERIFY & ROI
 - [ ] Re-run affected prompts after an applied batch

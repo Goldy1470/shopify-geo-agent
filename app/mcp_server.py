@@ -32,11 +32,15 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from . import db as database
 from . import tracking
+from .apply import apply_batch, audit_rows
+from .apply import apply_fix as apply_queued_fix
+from .apply import dry_run_fix as preview_fix
+from .apply import rollback_batch as rollback_applied_batch
+from .apply import rollback_fix as rollback_applied_fix
 from .config import load_config, save_config
 from .db import execute, query
 from .db.repo import get_state
 from .fixer import APPLICABLE_KINDS, FIX_TITLES
-from .fixer import apply_fix as apply_queued_fix
 from .readiness import product_readiness as run_product_readiness
 from .scoring import score_product
 from .shopify import get_catalog
@@ -434,9 +438,12 @@ def generate_fixes() -> dict[str, Any]:
 
 @mcp.tool(title="List fixes", annotations=READ)
 def list_fixes(status: str = "pending", limit: int = 50, full: bool = False) -> dict[str, Any]:
-    """List queued/applied/discarded fixes with impact, before/after previews. Read-only."""
-    if status not in {"pending", "applied", "discarded"}:
-        return {"ok": False, "error": "status must be pending, applied or discarded"}
+    """List queued/applied/rolled-back/failed fixes with impact and previews. Read-only."""
+    if status not in {"pending", "applied", "rolled_back", "failed", "discarded"}:
+        return {
+            "ok": False,
+            "error": "status must be pending, applied, rolled_back, failed or discarded",
+        }
     order = (
         "COALESCE(impact, 0) DESC, created_at DESC, id DESC"
         if status == "pending"
@@ -475,7 +482,8 @@ def list_fixes(status: str = "pending", limit: int = 50, full: bool = False) -> 
 def apply_fix(fix_id: int) -> dict[str, Any]:
     """Write one approved fix to Shopify (or the mock store). Refuses stale drafts.
 
-    Only call after the merchant explicitly approves this exact fix id.
+    Runs dry-run -> snapshot -> write -> read-back -> audit. Only call after the
+    merchant explicitly approves this exact fix id.
     """
     rows = query("SELECT * FROM fixes WHERE id=?", (fix_id,))
     if not rows:
@@ -483,26 +491,74 @@ def apply_fix(fix_id: int) -> dict[str, Any]:
     fix = dict(rows[0])
     if fix.get("status") != "pending":
         return {"ok": False, "error": "not_pending", "status": fix.get("status"), "fix_id": fix_id}
-    if fix.get("kind") not in APPLICABLE_KINDS:
-        return {
-            "ok": False,
-            "error": "unsupported_kind",
-            "fix_id": fix_id,
-            "kind": fix.get("kind"),
-            "note": "Manual task in this phase: copy the suggestion into Shopify admin.",
-        }
     result = apply_queued_fix(get_catalog(), fix_id)
     payload = {
         "ok": bool(result.get("ok")),
         "fix_id": fix_id,
         "kind": fix.get("kind"),
         "product_id": fix.get("product_id"),
+        "audit_id": result.get("audit_id"),
+        "rollback_available": result.get("rollback_available", False),
         "result": result,
     }
     if not payload["ok"]:
         payload["error"] = result.get("error")
         payload["note"] = result.get("note")
     return payload
+
+
+@mcp.tool(title="Dry-run fix", annotations=READ)
+def dry_run_fix(fix_id: int) -> dict[str, Any]:
+    """Check validators, staleness and the write plan for one fix without writing. Read-only."""
+    return preview_fix(get_catalog(), fix_id)
+
+
+@mcp.tool(title="Apply approved fixes (bulk)", annotations=WRITE)
+def apply_fixes(fix_ids: list[int], batch_size: int = 10) -> dict[str, Any]:
+    """Apply several merchant-approved fix ids in rate-limit-aware batches.
+
+    Stops early when Shopify throttles; applied fixes remain individually rollback-able.
+    """
+    result = apply_batch(get_catalog(), fix_ids, batch_size=batch_size, pause=0.2)
+    summaries = [
+        {
+            "fix_id": item.get("fix_id"),
+            "ok": bool(item.get("ok")),
+            "error": item.get("error"),
+            "note": item.get("note"),
+        }
+        for item in result.get("results", [])
+    ]
+    return {
+        "ok": bool(result.get("ok")),
+        "batch_id": result.get("batch_id"),
+        "status": result.get("status"),
+        "total": result.get("total"),
+        "applied": result.get("applied"),
+        "failed": result.get("failed"),
+        "stopped": result.get("stopped"),
+        "note": result.get("note"),
+        "results": summaries,
+    }
+
+
+@mcp.tool(title="Roll back applied fix", annotations=WRITE)
+def rollback_fix(fix_id: int) -> dict[str, Any]:
+    """Restore the pre-apply snapshot for one applied fix. Refuses newer merchant edits."""
+    return rollback_applied_fix(get_catalog(), fix_id)
+
+
+@mcp.tool(title="Roll back apply batch", annotations=WRITE)
+def rollback_batch(batch_id: str) -> dict[str, Any]:
+    """Restore snapshots for every still-applied fix in a batch, newest first."""
+    return rollback_applied_batch(get_catalog(), batch_id)
+
+
+@mcp.tool(title="Apply audit log", annotations=READ)
+def apply_audit(limit: int = 20, batch_id: str = "") -> dict[str, Any]:
+    """Append-only apply/refusal/rollback audit rows, newest first. Read-only."""
+    rows = audit_rows(min(max(int(limit), 1), 200), batch_id or None)
+    return {"count": len(rows), "rows": rows}
 
 
 @mcp.tool(title="Discard fix", annotations=WRITE)

@@ -2,7 +2,17 @@
 {% block title %}Fixes - Shopify GEO Agent{% endblock %}
 {% block content %}
 <h1>Fix queue</h1>
-<p class="sub">Prioritized by impact = visibility gap × revenue weight × confidence. Nothing goes live until you approve it. Auto-drafts can be applied to Shopify Admin ({{ 'mock store now' if not client_live else 'live store' }}); manual tasks link to the field to change.</p>
+<p class="sub">Prioritized by impact = visibility gap × revenue weight × confidence. Every write is dry-run, snapshotted, written, read back and audited. Nothing goes live until you approve it ({{ 'mock store now' if not client_live else 'live store' }}).</p>
+
+{% if flash %}
+<div class="flash">
+  {% if flash.applied is defined %}<span class="ok">Applied {{ flash.applied }}</span>{% if flash.failed %}, <span class="bad">{{ flash.failed }} failed</span>{% endif %}.{% endif %}
+  {% if flash.rolled %}<span class="ok">Rolled back {{ flash.rolled }}</span>.{% endif %}
+  {% if flash.discarded %}<span class="ok">Discarded {{ flash.discarded }}</span>.{% endif %}
+  {% if flash.saved %}<span class="ok">Draft saved.</span>{% endif %}
+  {% if flash.error %}<span class="bad">{{ flash.error }}</span>{% endif %}
+</div>
+{% endif %}
 
 <form method="post" action="/fixes/generate" class="inline">
   <input type="hidden" name="csrf_token" value="{{ csrf }}">
@@ -10,10 +20,17 @@
 </form>
 <section>
   <h2>Awaiting approval ({{ pending|length }})</h2>
+  <form id="bulk-form" method="post" action="/fixes/bulk" class="bulk-bar">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <button class="btn small" name="action" value="apply">Approve &amp; apply selected</button>
+    <button class="btn small ghost" name="action" value="discard">Discard selected</button>
+    <span class="hint">Bulk writes run in batches of 10 and stop early if Shopify throttles; applied fixes stay individually rollback-able.</span>
+  </form>
   {% for f in pending %}
   {% set impact = f.get('impact') or 0 %}
   <div class="fix">
     <div class="fix-head">
+      <label class="pick"><input type="checkbox" name="fix_ids" value="{{ f.get('id') }}" form="bulk-form"> select</label>
       <span class="sev sev-{{ f.get('severity') or 'medium' }}">{{ f.get('severity') or 'medium' }}</span>
       {{ fix_titles.get(f.get('kind'), f.get('kind')) }}
       · <a href="/products/{{ f.get('product_id') }}">{{ by_product.get(f.get('product_id'), f.get('product_id')) }}</a>
@@ -23,6 +40,7 @@
       <span class="chip {{ 'chip-missing' if not f.get('auto') else '' }}">{{ 'auto-draft' if f.get('auto') else 'manual task' }}</span>
       {% if f.get('field') %}<span class="chip">{{ f.get('field') }}</span>{% endif %}
       {% if f.get('judge_obj') %}<span class="chip chip-unchecked">LLM: {{ f.get('judge_obj').get('verdict') }}</span>{% endif %}
+      {% if f.get('batch_id') %}<span class="chip chip-unchecked">batch {{ f.get('batch_id') }}</span>{% endif %}
     </div>
     {% if f.get('notes') %}<p class="notes">{{ f.get('notes') }}</p>{% endif %}
     {% if f.get('before') %}
@@ -34,30 +52,108 @@
     {% endif %}
     <div class="row">
       {% if f.get('kind') in applicable_kinds and f.get('auto') %}
-      <button class="btn small" onclick="applyFix({{ f.get('id') }}, this, event)">Approve & apply</button>
+      <button class="btn small" onclick="applyFix({{ f.get('id') }}, this, event)">Approve &amp; apply</button>
+      <button class="btn small ghost" onclick="checkFix({{ f.get('id') }}, this, event)">Dry run</button>
       {% else %}
-      <span class="hint">Manual: copy this into Shopify admin (auto-apply for this field lands in Phase 5).</span>
+      <span class="hint">Manual: copy this into Shopify admin (auto-apply for this field lands in a later phase).</span>
       {% endif %}
       <form method="post" action="/fixes/{{ f.get('id') }}/discard">
         <input type="hidden" name="csrf_token" value="{{ csrf }}">
         <button class="btn small ghost">Discard</button>
       </form>
     </div>
+    {% if f.get('kind') in applicable_kinds and f.get('auto') %}
+    <details>
+      <summary>Edit before approving</summary>
+      <form method="post" action="/fixes/{{ f.get('id') }}/edit">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <label>Draft value (validators run again before this is saved)
+          <textarea name="after" rows="6">{{ f.get('after') }}</textarea>
+        </label>
+        <button class="btn small">Save draft</button>
+        <span class="hint">The product name must stay intact and every fact must trace back to the catalog.</span>
+      </form>
+    </details>
+    {% endif %}
   </div>
   {% else %}
   <p>Queue empty. Hit "Generate suggestions" above.</p>
   {% endfor %}
 </section>
 
-{% if applied %}
+{% if history %}
 <section>
   <h2>Recently applied</h2>
-  <table>
-    <thead><tr><th>Kind</th><th>Product</th><th>Applied</th></tr></thead>
-    <tbody>{% for f in applied %}<tr><td>{{ fix_titles.get(f.get('kind'), f.get('kind')) }}</td><td>{{ by_product.get(f.get('product_id'), f.get('product_id')) }}</td><td>{{ (f.get('applied_at') or '')[:19] }}</td></tr>{% endfor %}</tbody>
+  <table class="mini">
+    <thead><tr><th>Kind</th><th>Product</th><th>Status</th><th>When</th><th></th></tr></thead>
+    <tbody>
+    {% for f in history %}
+    <tr>
+      <td>{{ fix_titles.get(f.get('kind'), f.get('kind')) }}</td>
+      <td>{{ by_product.get(f.get('product_id'), f.get('product_id')) }}</td>
+      <td><span class="chip {{ 'chip-missing' if f.get('status') == 'failed' else ('chip-unchecked' if f.get('status') == 'rolled_back' else '') }}">{{ f.get('status') }}</span></td>
+      <td>{{ (f.get('rolled_back_at') or f.get('applied_at') or f.get('created_at') or '')[:19] }}</td>
+      <td>
+        {% if f.get('status') == 'applied' and f.get('snapshot') %}
+        <form method="post" action="/fixes/{{ f.get('id') }}/rollback" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <button class="btn small ghost">Roll back</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
   </table>
 </section>
 {% endif %}
+
+{% if batches %}
+<section>
+  <h2>Apply batches</h2>
+  <table class="mini">
+    <thead><tr><th>Batch</th><th>Status</th><th>Applied</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    {% for b in batches %}
+    <tr>
+      <td class="mono-cell">{{ b.get('id') }}</td>
+      <td>{{ b.get('status') }}</td>
+      <td>{{ b.get('applied') }}/{{ b.get('total') }}{% if b.get('failed') %}, {{ b.get('failed') }} failed{% endif %}</td>
+      <td>{{ (b.get('created_at') or '')[:19] }}</td>
+      <td>
+        {% if b.get('status') in ('applied', 'partial') and b.get('applied') %}
+        <form method="post" action="/fixes/batch/{{ b.get('id') }}/rollback" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <button class="btn small ghost">Roll back batch</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section>
+  <h2>Audit log <a class="hint" href="/fixes/audit">full log →</a></h2>
+  <table class="mini">
+    <thead><tr><th>When</th><th>Action</th><th>Status</th><th>Fix</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for a in audit %}
+    <tr>
+      <td>{{ (a.get('created_at') or '')[:19] }}</td>
+      <td>{{ a.get('action') }}</td>
+      <td><span class="chip {{ 'chip-missing' if a.get('status') in ('failed', 'refused') else '' }}">{{ a.get('status') }}</span></td>
+      <td>#{{ a.get('fix_id') }} {{ fix_titles.get(a.get('kind'), a.get('kind')) }}</td>
+      <td class="hint">{{ (a.get('error') or a.get('field') or '')[:120] }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="hint">No writes yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
 
 <script>
 function csrfHeader() {
@@ -66,13 +162,29 @@ function csrfHeader() {
 }
 async function applyFix(id, btn, ev) {
   if (ev) ev.stopPropagation();
+  btn.disabled = true;
+  btn.textContent = 'Applying…';
   const r = await fetch(`/fixes/${id}/approve`, {method: 'POST', headers: csrfHeader()});
   let j = {};
   try { j = await r.json(); } catch (_) {}
-  if (r.status === 403) { btn.textContent = 'Session expired - reload the page'; return; }
+  if (r.status === 403) { btn.textContent = 'Session expired - reload the page'; btn.disabled = false; return; }
   btn.textContent = j.ok ? 'Applied ✓' : (j.error || 'Error');
   if (!j.ok && j.note) btn.title = j.note;
   if (j.ok) setTimeout(() => window.location.reload(), 700);
+  else btn.disabled = false;
+}
+async function checkFix(id, btn, ev) {
+  if (ev) ev.stopPropagation();
+  btn.disabled = true;
+  const r = await fetch(`/fixes/${id}/dry-run`);
+  let j = {};
+  try { j = await r.json(); } catch (_) {}
+  if (j.ok) { btn.textContent = 'Ready ✓'; btn.title = j.note || ''; }
+  else {
+    btn.textContent = j.error === 'stale' ? 'Stale - re-draft' : (j.error || 'Blocked');
+    btn.title = j.note || (j.problems || []).join('; ');
+  }
+  btn.disabled = false;
 }
 </script>
 {% endblock %}

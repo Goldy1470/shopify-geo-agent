@@ -47,7 +47,7 @@ You: Draft fixes, show me the diffs, and apply only what I approve.
 | Products   | Per-SKU audit: score 0–100 across 6 weighted factors, drill into issues |
 | Agent access | robots.txt rules for 12 AI agents (GPTBot, PerplexityBot, ClaudeBot, **meta-webindexer/Meta-ExternalAgent for Muse**, …), llms.txt, JSON-LD Product schema, SSR/semantic HTML (buttons, labeled selects, aria-labels) |
 | Visibility | Log real answers from ChatGPT/Muse/Instinct (paste mode) or automate runs with an OpenAI key; tracks mention rate, which products got cited, which merchants got the checkout link |
-| Fixes      | Prioritized suggestions: impact-scored title/FAQ/description drafts, alt text, SEO fills, taxonomy/GTIN/variant/price tasks, JSON-LD Liquid snippet, review nudges. Validators block invented facts; only supported auto-drafts can be applied (nothing goes live until you approve) |
+| Fixes      | Prioritized suggestions: impact-scored title/FAQ/description drafts, alt text, SEO fills, taxonomy/GTIN/variant/price tasks, JSON-LD Liquid snippet, review nudges. Validators block invented facts. Approval queue supports single/bulk apply, edit-before-approve, dry-run, snapshot → write → read-back → audit, and one-click rollback (single fix or whole batch); bulk writes are chunked and stop early if Shopify throttles |
 | Answer analyzer | Every pasted agent answer is scored deterministically (no LLM, no API key): absolute rank by reading order, sentiment decision tree with anti-inflation caps, 5-dimension visibility, recommendation ladder, per-SKU GEO 0–100, competitor co-mentions, cited domains, risk flags |
 
 ## Answer analysis methodology
@@ -72,7 +72,7 @@ The visibility module ports the deterministic rules from [OneGlanse](https://git
 
 ## Notes
 
-- FAQ fixes write to metafield `geo_agent.faq_json` (render via a small theme snippet); titles/descriptions apply directly to the product. Alt text, SEO, taxonomy, barcode, variant, price, media and JSON-LD suggestions are manual tasks until the Phase 5 apply pipeline adds per-field snapshots/rollback.
+- FAQ fixes write to metafield `geo_agent.faq_json` (render via a small theme snippet); titles/descriptions apply directly to the product. Every applied fix is snapshotted before the write, verified by read-back, written to the append-only audit log, and can be rolled back (single fix or batch). Alt text, SEO, taxonomy, barcode, variant, price, media and JSON-LD suggestions remain manual tasks.
 - Muse/Instinct send no referrals and don't identify themselves — visibility uses what you can check directly (catalog presence, prompt runs) instead of referral data.
 - All state in `geo_agent.db` (SQLite); config in `config.json`. Delete both to reset.
 - Token stays local in `config.json`; nothing is sent anywhere except Shopify/OpenAI directly.

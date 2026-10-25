@@ -23,7 +23,7 @@ def test_generate_renders_prioritized_cards(client):
     assert "manual task" in text
     assert "Extend title" in text
     assert "Suggested Product JSON-LD Liquid snippet" in text
-    assert "Approve & apply" in text
+    assert "Approve &amp; apply" in text
     assert "Generate suggestions for all products" in text
 
 

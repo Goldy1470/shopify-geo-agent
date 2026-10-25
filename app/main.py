@@ -2,6 +2,7 @@ import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -11,6 +12,17 @@ from fastapi.templating import Jinja2Templates
 from . import db as database
 from . import tracking
 from .accessibility import run_full_check
+from .apply import (
+    apply_batch,
+    apply_fix,
+    audit_rows,
+    bulk_discard,
+    dry_run_fix,
+    recent_batches,
+    rollback_batch,
+    rollback_fix,
+    update_draft,
+)
 from .config import load_config, save_config
 from .core.security import (
     CSRF_COOKIE,
@@ -22,7 +34,7 @@ from .core.security import (
     origin_matches_host,
 )
 from .db import execute
-from .fixer import APPLICABLE_KINDS, FIX_TITLES, apply_fix
+from .fixer import APPLICABLE_KINDS, FIX_TITLES
 from .mcp_server import http_endpoint as mcp_http_endpoint
 from .readiness import product_readiness
 from .scoring import WEIGHTS, score_product
@@ -386,29 +398,53 @@ def fixes_page(request: Request):
             except (TypeError, ValueError):
                 fix["judge_obj"] = {"verdict": "unknown", "reason": str(fix["judge"])}
         pending.append(fix)
-    applied = [
-        dict(row) for row in database.query(
-            "SELECT * FROM fixes WHERE status='applied' ORDER BY applied_at DESC LIMIT 20"
+    history = [
+        dict(row)
+        for row in database.query(
+            "SELECT * FROM fixes WHERE status IN ('applied','rolled_back','failed') "
+            "ORDER BY COALESCE(applied_at, rolled_back_at, created_at) DESC, id DESC LIMIT 20"
         )
     ]
     catalog = get_catalog()
     by_product: dict[str, str] = {}
-    for f in pending + applied:
+    for f in pending + history:
         product_id = f.get("product_id") or ""
         if product_id in by_product:
             continue
         p = catalog.get_product(product_id)
         by_product[product_id] = (p or {}).get("title") or product_id
+    flash = {
+        key: request.query_params.get(key)
+        for key in ("applied", "failed", "discarded", "rolled", "batch", "error", "saved")
+        if request.query_params.get(key)
+    }
     return _render(
         request,
         "fixes.html",
         ctx(
             request,
             pending=pending,
-            applied=applied,
+            history=history,
+            batches=recent_batches(10),
+            audit=audit_rows(20),
+            flash=flash,
             fix_titles=FIX_TITLES,
             applicable_kinds=APPLICABLE_KINDS,
             by_product=by_product,
+        ),
+    )
+
+
+@app.get("/fixes/audit", response_class=HTMLResponse)
+def fixes_audit_page(request: Request):
+    return _render(
+        request,
+        "audit.html",
+        ctx(
+            request,
+            audit=audit_rows(200),
+            batches=recent_batches(20),
+            fix_titles=FIX_TITLES,
         ),
     )
 
@@ -425,6 +461,59 @@ def fix_approve(fix_id: int):
     # which lets CatalogService bridge to its async GraphQL client when live.
     result = apply_fix(get_catalog(), fix_id)
     return JSONResponse(result)
+
+
+@app.post("/fixes/{fix_id}/edit")
+def fix_edit(fix_id: int, after: str = Form("")):
+    result = update_draft(get_catalog(), fix_id, after)
+    if not result.get("ok"):
+        problems = result.get("problems") or [result.get("error") or "invalid_draft"]
+        return RedirectResponse(f"/fixes?error={quote(str(problems[0]))}", status_code=303)
+    return RedirectResponse("/fixes?saved=1", status_code=303)
+
+
+@app.get("/fixes/{fix_id}/dry-run")
+def fix_dry_run(fix_id: int):
+    return JSONResponse(dry_run_fix(get_catalog(), fix_id))
+
+
+@app.post("/fixes/bulk")
+def fixes_bulk(action: str = Form("apply"), fix_ids: list[int] = Form([])):
+    if action == "discard":
+        result = bulk_discard(fix_ids)
+        return RedirectResponse(
+            f"/fixes?discarded={result.get('discarded', 0)}", status_code=303
+        )
+    result = apply_batch(get_catalog(), fix_ids, batch_size=10, pause=0.2)
+    suffix = f"&error={quote(result['stopped'])}" if result.get("stopped") else ""
+    return RedirectResponse(
+        f"/fixes?batch={result.get('batch_id', '')}&applied={result.get('applied', 0)}"
+        f"&failed={result.get('failed', 0)}{suffix}",
+        status_code=303,
+    )
+
+
+@app.post("/fixes/{fix_id}/rollback")
+def fix_rollback(fix_id: int):
+    result = rollback_fix(get_catalog(), fix_id)
+    if result.get("ok"):
+        return RedirectResponse("/fixes?rolled=1", status_code=303)
+    return RedirectResponse(
+        f"/fixes?error={quote(result.get('error') or 'rollback_failed')}", status_code=303
+    )
+
+
+@app.post("/fixes/batch/{batch_id}/rollback")
+def fix_batch_rollback(batch_id: str):
+    result = rollback_batch(get_catalog(), batch_id)
+    if result.get("ok"):
+        return RedirectResponse(
+            f"/fixes?batch={quote(batch_id)}&rolled={result.get('rolled_back', 0)}",
+            status_code=303,
+        )
+    return RedirectResponse(
+        f"/fixes?error={quote(result.get('error') or 'rollback_failed')}", status_code=303
+    )
 
 
 @app.post("/fixes/{fix_id}/discard")

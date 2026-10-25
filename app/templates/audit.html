@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Apply audit - Shopify GEO Agent{% endblock %}
+{% block content %}
+<h1>Apply audit</h1>
+<p class="sub">Every apply, refusal and rollback. Snapshots are stored on the fix row; this log is append-only.</p>
+
+<section>
+  <h2>Batches</h2>
+  <table class="mini">
+    <thead><tr><th>Batch</th><th>Status</th><th>Applied</th><th>Failed</th><th>Created</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for b in batches %}
+    <tr>
+      <td class="mono-cell">{{ b.get('id') }}</td>
+      <td>{{ b.get('status') }}</td>
+      <td>{{ b.get('applied') }}/{{ b.get('total') }}</td>
+      <td>{{ b.get('failed') }}</td>
+      <td>{{ (b.get('created_at') or '')[:19] }}</td>
+      <td class="hint">{{ b.get('note') or '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="hint">No batches yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Audit rows</h2>
+  <table class="mini">
+    <thead><tr><th>When</th><th>Action</th><th>Status</th><th>Fix</th><th>Product</th><th>Batch</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for a in audit %}
+    <tr>
+      <td>{{ (a.get('created_at') or '')[:19] }}</td>
+      <td>{{ a.get('action') }}</td>
+      <td><span class="chip {{ 'chip-missing' if a.get('status') in ('failed', 'refused') else '' }}">{{ a.get('status') }}</span></td>
+      <td>#{{ a.get('fix_id') }} {{ fix_titles.get(a.get('kind'), a.get('kind')) }}</td>
+      <td>{{ a.get('product_id') }}</td>
+      <td class="mono-cell">{{ a.get('batch_id') or '' }}</td>
+      <td class="hint">{{ (a.get('error') or a.get('field') or '')[:160] }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="hint">No writes yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
