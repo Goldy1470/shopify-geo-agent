@@ -10,6 +10,7 @@ _DEFAULTS = {
     "mode": "mock",  # mock | live
     "openai_api_key": "",
     "mcp_token": "",  # optional bearer token for non-local MCP HTTP clients
+    "suggest_llm_refine": False,  # optional LLM judge over top-impact suggestions
     "brand": "Nimbus Outfitters",
     "site_url": "",
     "category_prompts": [

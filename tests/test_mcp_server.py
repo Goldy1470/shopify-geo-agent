@@ -298,13 +298,21 @@ def test_generate_apply_and_list_fix(seeded):
     generated = mcp_server.generate_fixes()
     assert generated["ok"] is True
     assert generated["created"] >= 1
+    assert generated["pending"] == generated["created"]
 
     pending = mcp_server.list_fixes()
     assert pending["count"] >= 1
     assert pending["counts"]["pending"] == pending["count"]
-    title_fix = next(f for f in pending["fixes"] if f["kind"] == "title_rewrite")
+    impacts = [f["impact"] or 0 for f in pending["fixes"]]
+    assert impacts == sorted(impacts, reverse=True), "pending fixes are impact-ordered"
+    title_fix = next(
+        f for f in pending["fixes"]
+        if f["kind"] == "title_rewrite" and f["applicable"] and f["auto"]
+    )
     assert title_fix["title"].startswith("Extend title")
     assert title_fix["product_title"]
+    assert title_fix["impact"] > 0
+    assert title_fix["severity"] in {"low", "medium", "high"}
 
     before = mcp_server.get_product(title_fix["product_id"])["product"]["title"]
     applied = mcp_server.apply_fix(title_fix["id"])
@@ -315,6 +323,18 @@ def test_generate_apply_and_list_fix(seeded):
 
     applied_list = mcp_server.list_fixes(status="applied")
     assert any(f["id"] == title_fix["id"] for f in applied_list["fixes"])
+
+
+def test_manual_suggestion_is_never_applied(seeded):
+    mcp_server.generate_fixes()
+    pending = mcp_server.list_fixes()["fixes"]
+    manual = next(f for f in pending if not f["auto"] and f["after"] == "")
+    assert manual["applicable"] is False
+    refused = mcp_server.apply_fix(manual["id"])
+    assert refused["ok"] is False
+    assert refused["error"] == "unsupported_kind"
+    still_pending = mcp_server.list_fixes()["fixes"]
+    assert any(f["id"] == manual["id"] for f in still_pending)
 
 
 def test_discard_fix_and_refuse_apply(seeded):

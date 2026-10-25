@@ -27,6 +27,7 @@
       {% if cfg.mcp_token %}<span class="hint">stored — leave blank to keep</span>{% endif %}
       <input name="mcp_token" type="password" placeholder="{{ '•••••• stored — leave blank to keep' if cfg.mcp_token else 'long random string or MCP_TOKEN env var' }}">
     </label>
+    <label class="check"><input type="checkbox" name="suggest_llm_refine" {% if cfg.suggest_llm_refine %}checked{% endif %}> Refine top suggestions with the LLM judge (needs OpenAI key; validators still gate every revision)</label>
     <label class="check"><input type="checkbox" name="erase_secrets"> Erase saved keys (Shopify token + API key + MCP token)</label>
     <label>Brand name <input name="brand" value="{{ cfg.brand }}"></label>
     <label>Storefront URL <input name="site_url" value="{{ cfg.site_url }}" placeholder="https://your-store.com"></label>

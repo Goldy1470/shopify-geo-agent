@@ -103,3 +103,38 @@ def test_description_block_replaces_stale_block():
 def test_description_block_gives_missing_data_task_not_fabrication():
     p = base_product(metafields={})
     assert draft_description_fix(p) is None
+
+
+def test_title_trims_the_suffix_never_the_name():
+    long_name = "Aurora Weatherproof Rolltop Travel Companion Pack"
+    fix = draft_title_fix(base_product(title=long_name))
+    assert fix is not None
+    assert fix["after"].startswith(long_name)
+    assert len(fix["after"]) <= 78
+
+
+def test_title_refuses_noop_placeholder_and_name_mutation():
+    # Product type + use case are already in the title: nothing safe to add.
+    assert draft_title_fix(base_product(title="Aurora Travel Backpack commuting")) is None
+    # A placeholder in the product type must never ship.
+    assert draft_title_fix(base_product(product_type="TODO")) is None
+    # A title containing " - " would make the name check ambiguous: refuse.
+    assert draft_title_fix(base_product(title="Aurora - Pack")) is None
+
+
+def test_faq_skips_when_three_exist_and_blocks_placeholder_values():
+    existing = [{"q": "q1", "a": "a1"}, {"q": "q2", "a": "a2"}, {"q": "q3", "a": "a3"}]
+    assert draft_faq_fix(base_product(faq=existing)) is None
+    assert draft_faq_fix(base_product(metafields={"material": "..."})) is None
+
+
+def test_description_refuses_placeholder_metafields():
+    assert draft_description_fix(base_product(metafields={"material": "TODO"})) is None
+
+
+def test_legacy_generate_fixes_is_idempotent():
+    from app.fixer import generate_fixes
+
+    p = base_product()
+    assert generate_fixes([p]) >= 1
+    assert generate_fixes([p]) == 0

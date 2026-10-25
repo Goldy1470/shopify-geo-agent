@@ -50,7 +50,12 @@ def init_db():
             after TEXT,
             status TEXT DEFAULT 'pending',
             created_at TEXT,
-            applied_at TEXT
+            applied_at TEXT,
+            impact REAL,
+            severity TEXT,
+            auto INTEGER,
+            notes TEXT,
+            judge TEXT
         );
         CREATE TABLE IF NOT EXISTS visibility_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +95,11 @@ def init_db():
         "ALTER TABLE visibility_runs ADD COLUMN looks_like_shopping INTEGER DEFAULT 0",
         "ALTER TABLE visibility_runs ADD COLUMN mentioned_brand TEXT",
         "ALTER TABLE visibility_runs ADD COLUMN prompt_id INTEGER",
+        "ALTER TABLE fixes ADD COLUMN impact REAL",
+        "ALTER TABLE fixes ADD COLUMN severity TEXT",
+        "ALTER TABLE fixes ADD COLUMN auto INTEGER",
+        "ALTER TABLE fixes ADD COLUMN notes TEXT",
+        "ALTER TABLE fixes ADD COLUMN judge TEXT",
     ):
         with contextlib.suppress(sqlite3.OperationalError):
             conn.execute(stmt)

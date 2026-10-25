@@ -22,13 +22,14 @@ from .core.security import (
     origin_matches_host,
 )
 from .db import execute
-from .fixer import FIX_TITLES, apply_fix, generate_fixes
+from .fixer import APPLICABLE_KINDS, FIX_TITLES, apply_fix
 from .mcp_server import http_endpoint as mcp_http_endpoint
 from .readiness import product_readiness
 from .scoring import WEIGHTS, score_product
 from .scoring_config import load_scoring_config
 from .shopify import get_catalog
 from .shopify_client import ShopifyClient
+from .suggest import generate_suggestions
 from .visibility import run_prompt_via_openai, save_run, visibility_summary
 
 templates = Jinja2Templates(directory="app/templates")
@@ -372,17 +373,32 @@ def prompt_detail(request: Request, prompt_id: int):
 
 @app.get("/fixes", response_class=HTMLResponse)
 def fixes_page(request: Request):
-    pending = database.query("SELECT * FROM fixes WHERE status='pending' ORDER BY created_at DESC")
-    applied = database.query(
-        "SELECT * FROM fixes WHERE status='applied' ORDER BY applied_at DESC LIMIT 20"
+    pending_rows = database.query(
+        "SELECT * FROM fixes WHERE status='pending' "
+        "ORDER BY COALESCE(impact, 0) DESC, created_at DESC, id DESC"
     )
+    pending = []
+    for row in pending_rows:
+        fix = dict(row)
+        if fix.get("judge"):
+            try:
+                fix["judge_obj"] = json.loads(fix["judge"])
+            except (TypeError, ValueError):
+                fix["judge_obj"] = {"verdict": "unknown", "reason": str(fix["judge"])}
+        pending.append(fix)
+    applied = [
+        dict(row) for row in database.query(
+            "SELECT * FROM fixes WHERE status='applied' ORDER BY applied_at DESC LIMIT 20"
+        )
+    ]
     catalog = get_catalog()
     by_product: dict[str, str] = {}
-    for f in pending:
-        p = catalog.get_product(f["product_id"])
-        by_product.setdefault(
-            f["product_id"], p.get("title", f["product_id"]) if p else f["product_id"]
-        )
+    for f in pending + applied:
+        product_id = f.get("product_id") or ""
+        if product_id in by_product:
+            continue
+        p = catalog.get_product(product_id)
+        by_product[product_id] = (p or {}).get("title") or product_id
     return _render(
         request,
         "fixes.html",
@@ -391,6 +407,7 @@ def fixes_page(request: Request):
             pending=pending,
             applied=applied,
             fix_titles=FIX_TITLES,
+            applicable_kinds=APPLICABLE_KINDS,
             by_product=by_product,
         ),
     )
@@ -398,7 +415,7 @@ def fixes_page(request: Request):
 
 @app.post("/fixes/generate")
 def fixes_generate():
-    generate_fixes(get_catalog().list_products())
+    generate_suggestions(get_catalog().list_products())
     return RedirectResponse("/fixes", status_code=303)
 
 
@@ -412,7 +429,9 @@ def fix_approve(fix_id: int):
 
 @app.post("/fixes/{fix_id}/discard")
 def fix_discard(fix_id: int):
-    database.execute("UPDATE fixes SET status='discarded' WHERE id=?", (fix_id,))
+    database.execute(
+        "UPDATE fixes SET status='discarded' WHERE id=? AND status='pending'", (fix_id,)
+    )
     return RedirectResponse("/fixes", status_code=303)
 
 
@@ -432,6 +451,7 @@ async def settings_save(
     mcp_token: str = Form(""),
     brand: str = Form(""),
     site_url: str = Form(""),
+    suggest_llm_refine: str = Form(""),
     erase_secrets: str = Form(""),
 ):
     cfg = load_config()
@@ -456,6 +476,7 @@ async def settings_save(
         "mcp_token": mcp_token,
         "brand": brand,
         "site_url": site_url,
+        "suggest_llm_refine": suggest_llm_refine == "on",
     }
     save_config(updates)
     return RedirectResponse("/settings", status_code=303)

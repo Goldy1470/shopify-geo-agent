@@ -167,14 +167,16 @@ itself, delete the custom app in Shopify admin.
 | `list_prompts` / `add_prompt` | read/write | Manage tracked shopping prompts |
 | `run_tracking` | write | Run prompts against configured official provider APIs |
 | `visibility_summary` | read | Mention rate, Wilson CIs, per-prompt stats, sources, competitors, trends |
-| `generate_fixes` | write (queue only) | Draft title/FAQ/description fixes; nothing goes live |
-| `list_fixes` | read | Pending/applied/discarded fixes with before/after previews |
-| `apply_fix` | **write to Shopify** | Apply one approved fix; refuses stale drafts |
+| `generate_fixes` | write (queue only) | Draft impact-prioritized suggestions (auto drafts + manual tasks); nothing goes live |
+| `list_fixes` | read | Impact-ordered fixes with before/after previews, severity, auto/manual flag |
+| `apply_fix` | **write to Shopify** | Apply one approved auto-draft; refuses stale, manual and unsupported kinds |
 | `discard_fix` | write | Drop a queued fix without touching the store |
 
 Writes are explicit tool calls. `generate_fixes` only queues drafts; `apply_fix` is the
 approval gate and applies exactly one fix id at a time. It re-checks that the live field
 still matches the draft (staleness check) and refuses to overwrite a merchant's newer edit.
+Manual tasks (alt text, SEO, taxonomy, GTIN, variants, price, media, JSON-LD, review nudges)
+are returned with `auto: 0` and cannot be applied through the API in this phase.
 
 ## Suggested conversation
 

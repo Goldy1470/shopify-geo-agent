@@ -83,6 +83,8 @@ def draft_title_fix(p: dict) -> dict | None:
     use_case = _use_case(f"{use} {t}")
     if use_case and use_case not in lower:
         suffix_parts.append(f"for {use_case}")
+    if not suffix_parts:
+        return None  # nothing safe to add; never ship a trailing separator
 
     candidate = t
     max_len = 78
@@ -128,8 +130,13 @@ def draft_faq_fix(p: dict) -> dict | None:
 
 
 def draft_description_fix(p: dict) -> dict | None:
-    """Marker-delimited specs block: replace-in-place, never duplicate, always escaped."""
-    body = p.get("body_html") or ""
+    """Marker-delimited specs block: replace-in-place, never duplicate, always escaped.
+
+    ``before`` is the full live body (including any stale geo-agent block) so the
+    apply-time staleness hash compares against exactly what Shopify returned.
+    """
+    original = p.get("body_html") or ""
+    body = original
     mf = {k: v for k, v in (p.get("metafields") or {}).items() if str(v or "").strip()}
     if not mf or len(body) > 2000:
         return None
@@ -151,7 +158,7 @@ def draft_description_fix(p: dict) -> dict | None:
     problems = validate_no_placeholders(html.unescape(inner_new))
     if problems:
         return None
-    return {"kind": "description_append", "field": "body_html", "before": body, "after": after}
+    return {"kind": "description_append", "field": "body_html", "before": original, "after": after}
 
 
 def generate_fixes(products: list[dict]) -> int:
@@ -179,7 +186,25 @@ FIX_TITLES = {
     "title_rewrite": "Extend title (adds type/use case, keeps the product name)",
     "faq_generate": "Add FAQ items (grounded in product specs)",
     "description_append": "Add/refresh specs block in description",
+    "seo_fill_title": "Fill SEO title (product name only)",
+    "seo_fill_description": "Fill SEO description (first description prose)",
+    "alt_text": "Add grounded image alt text",
+    "jsonld_snippet": "Suggested Product JSON-LD Liquid snippet",
+    "metafield_fill": "Fill attribute metafields from supplier data",
+    "taxonomy_fill": "Assign the Shopify taxonomy category",
+    "gtin_fill": "Add GTIN/barcode per variant",
+    "variant_fill": "Complete variant data (SKU + price)",
+    "price_fix": "Fix price/availability in Shopify admin",
+    "media_add": "Add product images/video",
+    "review_nudge": "Collect product reviews",
+    "faq": "Add FAQ content by hand",
+    "description_section": "Add missing description sections by hand",
 }
+
+# Kinds this phase can write through the Admin API. Everything else is a
+# merchant task until the Phase 5 apply pipeline adds snapshot/rollback support
+# for it (alt text, SEO metafields, taxonomy, barcodes, JSON-LD theme edits...).
+APPLICABLE_KINDS = frozenset({"title_rewrite", "description_append", "faq_generate"})
 
 APPLY_FIELD = {
     "title_rewrite": "title",
@@ -222,6 +247,39 @@ def apply_fix(client, fix_id: int) -> dict:
         return {"ok": False, "error": "not found"}
     fix = rows[0]
 
+    if fix["status"] != "pending":
+        return {"ok": False, "error": "not_pending", "status": fix["status"]}
+
+    if fix["kind"] not in APPLICABLE_KINDS:
+        return {
+            "ok": False,
+            "error": "unsupported_kind",
+            "note": (
+                f"'{fix['kind']}' is a merchant task in this phase; it is not written "
+                "automatically. Copy the suggestion into Shopify admin."
+            ),
+        }
+
+    # Legacy rows predate the auto column (NULL); only an explicit 0 marks a
+    # manual task. Manual tasks have no draft and must never be written.
+    if fix["auto"] == 0 or not (fix["after"] or "").strip():
+        return {
+            "ok": False,
+            "error": "unsupported_kind",
+            "note": "Manual task: there is no auto-draft to write. Copy the note into Shopify admin.",
+        }
+
+    try:
+        judge_verdict = json.loads(fix["judge"] or "{}").get("verdict")
+    except (TypeError, ValueError):
+        judge_verdict = None
+    if judge_verdict == "reject":
+        return {
+            "ok": False,
+            "error": "judge_rejected",
+            "note": "The optional LLM judge rejected this draft. Re-draft or edit it by hand.",
+        }
+
     current = _current_remote_state(client, fix)
     expected = _draft_state_hash(fix)
     if current is None:
@@ -236,14 +294,23 @@ def apply_fix(client, fix_id: int) -> dict:
     if fix["kind"] == "faq_generate":
         # FAQs aren't a native product field; store the approved set in the
         # geo_agent.faq_json metafield (type "json") for a theme block to render.
-        merge = json.loads(fix["after"])
-        client.set_product_metafield(fix["product_id"], merge)
+        try:
+            merge = json.loads(fix["after"])
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "invalid_after", "note": "FAQ draft is not valid JSON."}
+        if not isinstance(merge, list):
+            return {"ok": False, "error": "invalid_after", "note": "FAQ draft must be a JSON list."}
+        result = client.set_product_metafield(fix["product_id"], merge)
+        if isinstance(result, dict) and result.get("ok") is False:
+            return {"ok": False, "error": "write_failed", "note": "; ".join(result.get("errors") or [])}
         execute("UPDATE fixes SET status='applied', applied_at=? WHERE id=?", (now_iso(), fix_id))
         return {"ok": True, "note": "FAQ items saved to metafield geo_agent.faq_json."}
     field = APPLY_FIELD.get(fix["kind"])
     if not field:
-        return {"ok": False, "error": "unknown kind"}
-    client.update_product(fix["product_id"], {field: fix["after"]})
+        return {"ok": False, "error": "unsupported_kind"}
+    result = client.update_product(fix["product_id"], {field: fix["after"]})
+    if isinstance(result, dict) and result.get("ok") is False:
+        return {"ok": False, "error": "write_failed", "note": "; ".join(result.get("errors") or [])}
     execute("UPDATE fixes SET status='applied', applied_at=? WHERE id=?", (now_iso(), fix_id))
     return {"ok": True, "note": f"Updated {field} in Shopify."}
 

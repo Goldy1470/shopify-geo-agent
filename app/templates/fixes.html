@@ -2,30 +2,50 @@
 {% block title %}Fixes - Shopify GEO Agent{% endblock %}
 {% block content %}
 <h1>Fix queue</h1>
-<p class="sub">Deterministic drafts, nothing goes live until you approve it. Approve pushes the change to Shopify Admin ({{ 'mock store now' if not client_live else 'live store' }}).</p>
+<p class="sub">Prioritized by impact = visibility gap × revenue weight × confidence. Nothing goes live until you approve it. Auto-drafts can be applied to Shopify Admin ({{ 'mock store now' if not client_live else 'live store' }}); manual tasks link to the field to change.</p>
 
 <form method="post" action="/fixes/generate" class="inline">
   <input type="hidden" name="csrf_token" value="{{ csrf }}">
-  <button class="btn">Draft fixes for all products</button>
+  <button class="btn">Generate suggestions for all products</button>
 </form>
 <section>
   <h2>Awaiting approval ({{ pending|length }})</h2>
   {% for f in pending %}
+  {% set impact = f.get('impact') or 0 %}
   <div class="fix">
-    <div class="fix-head">{{ fix_titles[f.kind] }} · <a href="/products/{{ f.product_id }}">{{ by_product.get(f.product_id) }}</a></div>
-    <div class="mono before">{{ f.before[:200] if f.before }}</div>
+    <div class="fix-head">
+      <span class="sev sev-{{ f.get('severity') or 'medium' }}">{{ f.get('severity') or 'medium' }}</span>
+      {{ fix_titles.get(f.get('kind'), f.get('kind')) }}
+      · <a href="/products/{{ f.get('product_id') }}">{{ by_product.get(f.get('product_id'), f.get('product_id')) }}</a>
+    </div>
+    <div class="fix-meta">
+      <span class="chip">impact {{ impact|round|int }}</span>
+      <span class="chip {{ 'chip-missing' if not f.get('auto') else '' }}">{{ 'auto-draft' if f.get('auto') else 'manual task' }}</span>
+      {% if f.get('field') %}<span class="chip">{{ f.get('field') }}</span>{% endif %}
+      {% if f.get('judge_obj') %}<span class="chip chip-unchecked">LLM: {{ f.get('judge_obj').get('verdict') }}</span>{% endif %}
+    </div>
+    {% if f.get('notes') %}<p class="notes">{{ f.get('notes') }}</p>{% endif %}
+    {% if f.get('before') %}
+    <div class="mono before">{{ f.get('before')[:400] }}{% if f.get('before')|length > 400 %}…{% endif %}</div>
     <div class="arrow">↓</div>
-    <div class="mono after">{{ f.after[:600] }}</div>
+    {% endif %}
+    {% if f.get('after') %}
+    <div class="mono after">{{ f.get('after')[:1200] }}{% if f.get('after')|length > 1200 %}…{% endif %}</div>
+    {% endif %}
     <div class="row">
-      <button class="btn small" onclick="applyFix({{ f.id }}, this, event)">Approve & apply</button>
-      <form method="post" action="/fixes/{{ f.id }}/discard">
+      {% if f.get('kind') in applicable_kinds and f.get('auto') %}
+      <button class="btn small" onclick="applyFix({{ f.get('id') }}, this, event)">Approve & apply</button>
+      {% else %}
+      <span class="hint">Manual: copy this into Shopify admin (auto-apply for this field lands in Phase 5).</span>
+      {% endif %}
+      <form method="post" action="/fixes/{{ f.get('id') }}/discard">
         <input type="hidden" name="csrf_token" value="{{ csrf }}">
         <button class="btn small ghost">Discard</button>
       </form>
     </div>
   </div>
   {% else %}
-  <p>Queue empty. Hit "Draft fixes" above.</p>
+  <p>Queue empty. Hit "Generate suggestions" above.</p>
   {% endfor %}
 </section>
 
@@ -34,7 +54,7 @@
   <h2>Recently applied</h2>
   <table>
     <thead><tr><th>Kind</th><th>Product</th><th>Applied</th></tr></thead>
-    <tbody>{% for f in applied %}<tr><td>{{ fix_titles.get(f.kind, f.kind) }}</td><td>{{ f.product_id }}</td><td>{{ (f.applied_at or '')[:19] }}</td></tr>{% endfor %}</tbody>
+    <tbody>{% for f in applied %}<tr><td>{{ fix_titles.get(f.get('kind'), f.get('kind')) }}</td><td>{{ by_product.get(f.get('product_id'), f.get('product_id')) }}</td><td>{{ (f.get('applied_at') or '')[:19] }}</td></tr>{% endfor %}</tbody>
   </table>
 </section>
 {% endif %}
@@ -51,6 +71,7 @@ async function applyFix(id, btn, ev) {
   try { j = await r.json(); } catch (_) {}
   if (r.status === 403) { btn.textContent = 'Session expired - reload the page'; return; }
   btn.textContent = j.ok ? 'Applied ✓' : (j.error || 'Error');
+  if (!j.ok && j.note) btn.title = j.note;
   if (j.ok) setTimeout(() => window.location.reload(), 700);
 }
 </script>

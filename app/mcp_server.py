@@ -35,14 +35,14 @@ from . import tracking
 from .config import load_config, save_config
 from .db import execute, query
 from .db.repo import get_state
-from .fixer import FIX_TITLES
+from .fixer import APPLICABLE_KINDS, FIX_TITLES
 from .fixer import apply_fix as apply_queued_fix
-from .fixer import generate_fixes as draft_fixes
 from .readiness import product_readiness as run_product_readiness
 from .scoring import score_product
 from .shopify import get_catalog
 from .shopify.graphql import ShopifyGraphQLClient, ShopifyRequestError
 from .shopify.service import CatalogService
+from .suggest import generate_suggestions
 from .visibility import visibility_summary as summarize_visibility
 
 READ = ToolAnnotations(read_only_hint=True, open_world_hint=False)
@@ -420,23 +420,29 @@ def visibility_summary(include_responses: bool = False, limit: int = 10) -> dict
 
 @mcp.tool(title="Generate fix drafts", annotations=WRITE)
 def generate_fixes() -> dict[str, Any]:
-    """Draft title/FAQ/description fixes into the approval queue. Does NOT write to Shopify."""
+    """Prioritized title/FAQ/description drafts plus manual tasks. Does NOT write to Shopify."""
     catalog = get_catalog()
-    created = draft_fixes(catalog.list_products())
+    inserted = generate_suggestions(catalog.list_products())
     return {
         "ok": True,
-        "created": created,
+        "created": len(inserted),
         "pending": _pending_fix_count(),
-        "note": "Drafts are queued only. Review them, then call apply_fix for ids the merchant approves.",
+        "note": "Suggestions are queued only, ordered by impact. Review them, then call apply_fix "
+                "for ids the merchant approves. Manual tasks cannot be auto-applied in this phase.",
     }
 
 
 @mcp.tool(title="List fixes", annotations=READ)
 def list_fixes(status: str = "pending", limit: int = 50, full: bool = False) -> dict[str, Any]:
-    """List queued/applied/discarded fixes with before/after previews. Read-only."""
+    """List queued/applied/discarded fixes with impact, before/after previews. Read-only."""
     if status not in {"pending", "applied", "discarded"}:
         return {"ok": False, "error": "status must be pending, applied or discarded"}
-    rows = query("SELECT * FROM fixes WHERE status=? ORDER BY created_at DESC, id DESC", (status,))
+    order = (
+        "COALESCE(impact, 0) DESC, created_at DESC, id DESC"
+        if status == "pending"
+        else "created_at DESC, id DESC"
+    )
+    rows = query(f"SELECT * FROM fixes WHERE status=? ORDER BY {order}", (status,))
     catalog = get_catalog()
     titles: dict[str, str] = {}
     limit = min(max(int(limit), 1), 200)
@@ -449,6 +455,9 @@ def list_fixes(status: str = "pending", limit: int = 50, full: bool = False) -> 
             titles[product_id] = (product or {}).get("title") or product_id
         fix["product_title"] = titles[product_id]
         fix["title"] = FIX_TITLES.get(fix.get("kind") or "", fix.get("kind") or "fix")
+        fix["applicable"] = bool(
+            fix.get("auto") and fix.get("kind") in APPLICABLE_KINDS and (fix.get("after") or "").strip()
+        )
         if not full:
             for field in ("before", "after"):
                 value = fix.get(field) or ""
@@ -474,14 +483,26 @@ def apply_fix(fix_id: int) -> dict[str, Any]:
     fix = dict(rows[0])
     if fix.get("status") != "pending":
         return {"ok": False, "error": "not_pending", "status": fix.get("status"), "fix_id": fix_id}
+    if fix.get("kind") not in APPLICABLE_KINDS:
+        return {
+            "ok": False,
+            "error": "unsupported_kind",
+            "fix_id": fix_id,
+            "kind": fix.get("kind"),
+            "note": "Manual task in this phase: copy the suggestion into Shopify admin.",
+        }
     result = apply_queued_fix(get_catalog(), fix_id)
-    return {
+    payload = {
         "ok": bool(result.get("ok")),
         "fix_id": fix_id,
         "kind": fix.get("kind"),
         "product_id": fix.get("product_id"),
         "result": result,
     }
+    if not payload["ok"]:
+        payload["error"] = result.get("error")
+        payload["note"] = result.get("note")
+    return payload
 
 
 @mcp.tool(title="Discard fix", annotations=WRITE)

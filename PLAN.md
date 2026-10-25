@@ -110,13 +110,13 @@ SQLite default; `DATABASE_URL` switches to Postgres. Alembic migrations from day
 - [x] Pages: Visibility, prompt detail, competitors
 
 ### Phase 4 — SUGGEST
-- [ ] Engine modes: rules/templates + LLM-judged via same provider interface
-- [ ] Fix types: title extension, description sections, FAQ, alt text, metafield/taxonomy fill,
+- [x] Engine modes: rules/templates + LLM-judged via same provider interface
+- [x] Fix types: title extension, description sections, FAQ, alt text, metafield/taxonomy fill,
       JSON-LD Liquid snippet (suggested, never auto-installed), review-collection nudge,
       missing-data tasks
-- [ ] Validators: name preserved, limits, placeholders, claim-tracing, HTML-safe, no dupes,
+- [x] Validators: name preserved, limits, placeholders, claim-tracing, HTML-safe, no dupes,
       no ALL-CAPS/stuffing
-- [ ] Impact score = visibility gap × revenue weight × fix confidence; diffs in UI
+- [x] Impact score = visibility gap × revenue weight × fix confidence; diffs in UI
 
 ### Phase 5 — APPLY
 - [ ] Approval queue: single/bulk, edit-before-approve, discard
